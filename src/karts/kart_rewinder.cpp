@@ -59,6 +59,7 @@ void KartRewinder::reset()
  */
 void KartRewinder::saveTransform()
 {
+    clearRewoundTransform();
     m_saved_transform = getTrans();
 }   // saveTransform
 

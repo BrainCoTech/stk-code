@@ -1056,6 +1056,15 @@ void World::update(int ticks)
 
     Physics::getInstance()->update(ticks);
 
+    for (int i = 0 ; i < kart_amount; i++)
+    {
+        SpareTireAI* sta =
+            dynamic_cast<SpareTireAI*>(m_karts[i]->getController());
+        // Update all karts that are not eliminated
+        if(!m_karts[i]->isEliminated() || (sta && sta->isMoving()))
+            static_cast<Kart*>(m_karts[i])->handleRewoundTransform();
+    }
+
     PROFILER_PUSH_CPU_MARKER("World::update (projectiles)", 0xa0, 0x7F, 0x00);
     projectile_manager->update(ticks);
     PROFILER_POP_CPU_MARKER();

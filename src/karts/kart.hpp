@@ -32,6 +32,7 @@
 #include "karts/abstract_kart.hpp"
 #include "utils/no_copy.hpp"
 
+#include <list>
 #include <SColor.h>
 
 class AbstractKartAnimation;
@@ -250,6 +251,8 @@ protected:
     int          m_ticks_last_crash;
     RaceManager::KartType m_type;
 
+    std::list<btTransform> m_rewound_transforms;
+
     /** To prevent using nitro in too short bursts */
     int           m_min_nitro_ticks;
 
@@ -265,6 +268,8 @@ protected:
     float         getActualWheelForce();
     void          playCrashSFX(const Material* m, AbstractKart *k);
     void          loadData(RaceManager::KartType type, bool animatedModel);
+    // ------------------------------------------------------------------------
+    void clearRewoundTransform()              { m_rewound_transforms.clear(); }
 
 public:
                    Kart(const std::string& ident, unsigned int world_kart_id,
@@ -547,6 +552,9 @@ public:
     virtual void playSound(SFXBuffer* buffer) OVERRIDE;
     // ------------------------------------------------------------------------
     virtual bool isVisible() OVERRIDE;
+    // ------------------------------------------------------------------------
+    void handleRewoundTransform();
+
 };   // Kart
 
 
