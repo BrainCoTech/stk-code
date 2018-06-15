@@ -59,7 +59,8 @@ void KartRewinder::reset()
  */
 void KartRewinder::saveTransform()
 {
-    m_saved_transform = getTrans();
+    m_saved_transform = m_rewound_transforms.empty() ?
+        getTrans() : m_rewound_transforms.front();
     m_rewound_transforms.clear();
 }   // saveTransform
 
@@ -78,8 +79,6 @@ void KartRewinder::computeError()
         Vec3 cur_position = copied.front().getOrigin();
         if ((cur_position - saved_position).length() < 0.25f)
         {
-            setTrans(copied.front());
-            copied.pop_front();
             std::swap(m_rewound_transforms, copied);
             return;
         }
@@ -87,12 +86,6 @@ void KartRewinder::computeError()
     }
 
     // Use newly rewound one if no matching transformation
-    setTrans(m_rewound_transforms.front());
-    m_rewound_transforms.pop_front();
-    //btTransform error = getTrans() - m_saved_transform;
-    //Vec3 pos_error = getTrans().getOrigin() - m_saved_transform.getOrigin();
-    //btQuaternion rot_error(0, 0, 0, 1);
-    //Kart::addError(pos_error, rot_error);
 }   // computeError
 
 // ----------------------------------------------------------------------------

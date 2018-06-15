@@ -38,8 +38,8 @@ Moveable::Moveable()
     m_mesh            = NULL;
     m_node            = NULL;
     m_heading         = 0;
-    m_positional_error = Vec3(0.0f, 0.0f, 0.0f);
-    m_rotational_error = btQuaternion(0.0f, 0.0f, 0.0f, 1.0f);
+    m_network_transform = m_transform =
+        btTransform(btQuaternion(0.0f, 0.0f, 0.0f, 1.0f));
 }   // Moveable
 
 //-----------------------------------------------------------------------------
@@ -62,26 +62,6 @@ void Moveable::setNode(scene::ISceneNode *n)
 }   // setNode
 
 //-----------------------------------------------------------------------------
-/** Adds a new error between graphical and physical position/rotation. Called
- *  in case of a rewind to allow to for smoothing the visuals in case of
- *  incorrect client prediction.
- *  \param pos_error Positional error to add.
- *  \param rot_Error Rotational error to add.
- */
-void Moveable::addError(const Vec3& pos_error,
-                        const btQuaternion &rot_error)
-{
-    m_positional_error += pos_error;
-#ifdef DEBUG_VISUAL_ERROR
-    Log::info("VisualError", "time %f addError %f %f %f size %f",
-        World::getWorld()->getTime(),
-        m_positional_error.getX(), m_positional_error.getY(), m_positional_error.getZ(),
-        m_positional_error.length());
-#endif
-    m_rotational_error *= rot_error;
-}   // addError
-
-//-----------------------------------------------------------------------------
 /** Updates the graphics model. Mainly set the graphical position to be the
  *  same as the physics position, but uses offsets to position and rotation
  *  for special gfx effects (e.g. skidding will turn the karts more).
@@ -91,24 +71,42 @@ void Moveable::addError(const Vec3& pos_error,
 void Moveable::updateGraphics(float dt, const Vec3& offset_xyz,
                               const btQuaternion& rotation)
 {
-    // If this is a client, don't smooth error during rewinds
-    if (World::getWorld()->isNetworkWorld() &&
-        NetworkConfig::get()->isClient() &&
-        !RewindManager::get()->isRewinding())
+    Vec3 cur_xyz = m_transform.getOrigin();
+    btQuaternion cor_rot = m_transform.getRotation();
+
+    if (useNetworkTransform())
     {
-        float error = m_positional_error.length();
-        m_positional_error *= stk_config->m_positional_smoothing.get(error);
-#ifdef DEBUG_VISUAL_ERROR
-        Log::info("VisualError", "time %f reduceError %f %f %f size %f",
-            World::getWorld()->getTime(),
-            m_positional_error.getX(), m_positional_error.getY(), m_positional_error.getZ(),
-            m_positional_error.length());
-#endif
+        float l = (getXYZ() -
+            m_network_transform.getOrigin()).length();
+        Vec3 lc = m_network_transform.inverse()(getXYZ());
+        l = lc.z() > 0.0f ? l : -l;
+
+        // Move forward
+        cur_xyz = m_network_transform(Vec3(0.0f, 0.0f, l));
+
+        lc = m_transform.inverse()(cur_xyz);
+        // Adjust up (needed when up/down-sloping)
+        btTransform t = m_network_transform;
+        t.setOrigin(cur_xyz);
+        cur_xyz = t(Vec3(0.0f, -lc.y(), 0.0f));
+
+        cor_rot = m_network_transform.getRotation();
     }
+
+#undef XX
+#ifdef XX
+    // Gnuplot compare command
+    // plot "stdout.log" u 6:8 w lp lw 2, "stdout.log" u 10:12 w lp lw 2
+    Log::verbose("Smoothing", "%s smoothed-xyz(6-8) %f %f %f "
+        "xyz(10-12) %f %f %f", getIdent().c_str(),
+        cur_xyz.getX(), cur_xyz.getY(), cur_xyz.getZ(),
+        getXYZ().getX(), getXYZ().getY(), getXYZ().getZ());
+#endif
+
 #ifndef SERVER_ONLY
-    Vec3 xyz=getXYZ()+offset_xyz;
+    Vec3 xyz = cur_xyz + offset_xyz;
     m_node->setPosition(xyz.toIrrVector());
-    btQuaternion r_all = getRotation()*rotation;
+    btQuaternion r_all = cor_rot * rotation;
     if(btFuzzyZero(r_all.getX()) && btFuzzyZero(r_all.getY()-0.70710677f) &&
        btFuzzyZero(r_all.getZ()) && btFuzzyZero(r_all.getW()-0.70710677f)   )
         r_all.setX(0.000001f);
@@ -129,6 +127,7 @@ void Moveable::reset()
         m_body->setAngularVelocity(btVector3(0, 0, 0));
         m_body->setCenterOfMassTransform(m_transform);
     }
+    m_network_transform = m_transform;
 #ifndef SERVER_ONLY
     m_node->setVisible(true);  // In case that the objects was eliminated
 #endif

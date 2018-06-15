@@ -32,6 +32,8 @@ using namespace irr;
 #include "utils/no_copy.hpp"
 #include "utils/vec3.hpp"
 
+#include <string>
+
 class Material;
 
 /**
@@ -50,13 +52,9 @@ private:
     /** The roll between -180 and 180 degrees. */
     float                  m_roll;
 
-    /** Client prediction in networked games might cause the visual
-     *  and physical position to be different. For visual smoothing
-     *  this variable accumulates the error and reduces it over time. */
-    Vec3                   m_positional_error;
-
-    /** Similar to m_positional_error for rotation. */
-    btQuaternion           m_rotational_error;
+    /** The bullet transform of this rigid body for smoother remote
+     *  movement. */
+    btTransform m_network_transform;
 
 protected:
     UserPointer            m_user_pointer;
@@ -129,14 +127,23 @@ public:
                  &getTrans() const {return m_transform;}
     void          setTrans(const btTransform& t);
     void          updatePosition();
-    void          addError(const Vec3& pos_error,
-                           const btQuaternion &rot_error);
-    // ------------------------------------------------------------------------
     /** Called once per rendered frame. It is used to only update any graphical
      *  effects.
      *  \param dt Time step size (since last call).
      */
     virtual void  updateGraphics(float dt) = 0;
+    // ------------------------------------------------------------------------
+    const btTransform& getNetworkTrans() const  { return m_network_transform; }
+    // ------------------------------------------------------------------------
+    void setNetworkTrans(const btTransform& t)     { m_network_transform = t; }
+    // ------------------------------------------------------------------------
+    virtual bool useNetworkTransform() const                  { return false; }
+    // ------------------------------------------------------------------------
+    virtual const std::string& getIdent() const
+    {
+        static std::string unused("unused");
+        return unused;
+    }
 };   // class Moveable
 
 #endif

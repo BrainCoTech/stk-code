@@ -552,6 +552,8 @@ public:
     virtual bool isVisible() OVERRIDE;
     // ------------------------------------------------------------------------
     void handleRewoundTransform();
+    // ------------------------------------------------------------------------
+    virtual bool useNetworkTransform() const OVERRIDE;
 
 };   // Kart
 

@@ -1690,15 +1690,17 @@ void Kart::update(int ticks)
 //-----------------------------------------------------------------------------
 void Kart::handleRewoundTransform()
 {
-    if (!m_controller->isLocalPlayerController())
+    if (useNetworkTransform())
     {
         if (RewindManager::get()->isRewinding())
             m_rewound_transforms.push_back(getTrans());
         else if (!m_rewound_transforms.empty())
         {
-            setTrans(m_rewound_transforms.front());
+            setNetworkTrans(m_rewound_transforms.front());
             m_rewound_transforms.pop_front();
         }
+        else
+            setNetworkTrans(getTrans());
     }
 }   // handleRewoundTransform
 
@@ -3178,5 +3180,13 @@ bool Kart::isVisible()
 {
     return m_node && m_node->isVisible();
 }   // isVisible
+
+// ------------------------------------------------------------------------
+bool Kart::useNetworkTransform() const
+{
+    return !m_controller->isLocalPlayerController() &&
+        NetworkConfig::get()->isNetworking() &&
+        NetworkConfig::get()->isClient();
+}   // useNetworkTransform
 
 /* EOF */
