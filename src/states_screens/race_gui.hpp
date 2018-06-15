@@ -27,6 +27,7 @@
 using namespace irr;
 
 #include "states_screens/race_gui_base.hpp"
+#include "fusi_sdk.h"
 
 class AbstractKart;
 class InputMap;
@@ -132,6 +133,7 @@ private:
     void drawGlobalTimer       ();
     void drawLiveDifference    ();
     void drawScores();
+    void drawFocusScore();
 
 
 public:

@@ -571,6 +571,11 @@ if(MINGW)
     endif()
 endif()
 
+if(NOT SERVER_ONLY)
+    include_directories("${PROJECT_SOURCE_DIR}/lib/fusi_sdk/include")
+    target_link_libraries(supertuxkart ${PROJECT_SOURCE_DIR}/lib/fusi_sdk/libfusi.a)
+    target_link_libraries(supertuxkart ${PROJECT_SOURCE_DIR}/lib/fusi_sdk/libuv.a)
+endif()
 
 # ==== Checking if data folder exists ====
 if(NOT IS_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/data)
