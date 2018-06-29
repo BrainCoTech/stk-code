@@ -22,6 +22,7 @@
 #include "input/gamepad_config.hpp"
 #include "input/gamepad_android_config.hpp"
 #include "input/keyboard_config.hpp"
+#include "input/focus_config.hpp"
 #include "io/xml_node.hpp"
 #include "utils/log.hpp"
 
@@ -51,6 +52,10 @@ DeviceConfig* DeviceConfig::create(const XMLNode *config)
     else if(config->getName()=="gamepad_android")
     {
         device_config = new GamepadAndroidConfig();
+    }
+    else if(config->getName()=="focus")
+    {
+        device_config = new FocusConfig();
     }
     else
     {
@@ -135,6 +140,11 @@ irr::core::stringw DeviceConfig::getMappingIdString (const PlayerAction action) 
 
             case Input::IT_MOUSEBUTTON:
                 return_string += "mousebtn_";
+                return_string += id;
+                break;
+
+            case Input::IT_FOCUS:
+                return_string += "focus_";
                 return_string += id;
                 break;
 

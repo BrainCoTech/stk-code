@@ -129,37 +129,47 @@ void OptionsScreenDevice::init()
     LabelWidget* label = getWidget<LabelWidget>("title");
     label->setText( m_config->getName().c_str(), false );
 
-    GUIEngine::ListWidget* actions =
-        getWidget<GUIEngine::ListWidget>("actions");
-    assert( actions != NULL );
+    if (!m_config->isFocusDevice())
+    {
+        GUIEngine::ListWidget* actions =
+            getWidget<GUIEngine::ListWidget>("actions");
+        assert( actions != NULL );
 
-    // ---- create list skeleton (right number of items, right internal names)
-    //      their actualy contents will be adapted as needed after
+        // ---- create list skeleton (right number of items, right internal names)
+        //      their actualy contents will be adapted as needed after
 
-    //I18N: Key binding section
-    addListItemSubheader(actions, "game_keys_section", _("Game Keys"));
-    addListItem(actions, PA_STEER_LEFT);
-    addListItem(actions, PA_STEER_RIGHT);
-    addListItem(actions, PA_ACCEL);
-    addListItem(actions, PA_BRAKE);
-    addListItem(actions, PA_FIRE);
-    addListItem(actions, PA_NITRO);
-    addListItem(actions, PA_DRIFT);
-    addListItem(actions, PA_LOOK_BACK);
-    addListItem(actions, PA_RESCUE);
-    addListItem(actions, PA_PAUSE_RACE);
+        //I18N: Key binding section
+        addListItemSubheader(actions, "game_keys_section", _("Game Keys"));
+        addListItem(actions, PA_STEER_LEFT);
+        addListItem(actions, PA_STEER_RIGHT);
+        addListItem(actions, PA_ACCEL);
+        addListItem(actions, PA_BRAKE);
+        addListItem(actions, PA_FIRE);
+        addListItem(actions, PA_NITRO);
+        addListItem(actions, PA_DRIFT);
+        addListItem(actions, PA_LOOK_BACK);
+        addListItem(actions, PA_RESCUE);
+        addListItem(actions, PA_PAUSE_RACE);
 
 
-    //I18N: Key binding section
-    addListItemSubheader(actions, "menu_keys_section", _("Menu Keys"));
-    addListItem(actions, PA_MENU_UP);
-    addListItem(actions, PA_MENU_DOWN);
-    addListItem(actions, PA_MENU_LEFT);
-    addListItem(actions, PA_MENU_RIGHT);
-    addListItem(actions, PA_MENU_SELECT);
-    addListItem(actions, PA_MENU_CANCEL);
+        //I18N: Key binding section
+        addListItemSubheader(actions, "menu_keys_section", _("Menu Keys"));
+        addListItem(actions, PA_MENU_UP);
+        addListItem(actions, PA_MENU_DOWN);
+        addListItem(actions, PA_MENU_LEFT);
+        addListItem(actions, PA_MENU_RIGHT);
+        addListItem(actions, PA_MENU_SELECT);
+        addListItem(actions, PA_MENU_CANCEL);
 
-    updateInputButtons();
+        updateInputButtons();
+    }
+    else
+    {
+        GUIEngine::ListWidget* actions =
+            getWidget<GUIEngine::ListWidget>("actions");
+        assert( actions != NULL );
+        actions->setVisible(false);
+    }
 
     // Disable deletion keyboard configurations
     bool in_game = StateManager::get()->getGameState() == GUIEngine::INGAME_MENU;

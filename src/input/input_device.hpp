@@ -37,7 +37,8 @@ enum DeviceType
 {
     DT_KEYBOARD,
     DT_GAMEPAD,
-    DT_MULTITOUCH
+    DT_MULTITOUCH,
+    DT_FOCUS
 };
 
 /**

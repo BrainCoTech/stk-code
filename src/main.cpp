@@ -199,6 +199,7 @@
 #include "input/input_manager.hpp"
 #include "input/keyboard_device.hpp"
 #include "input/wiimote_manager.hpp"
+#include "input/focus_device_manager.hpp"
 #include "io/file_manager.hpp"
 #include "items/attachment_manager.hpp"
 #include "items/item_manager.hpp"
@@ -1750,6 +1751,8 @@ int main(int argc, char *argv[] )
         wiimote_manager = new WiimoteManager();
 #endif
 
+        focus_device_manager = new FocusDeviceManager();
+
         // Get into menu mode initially.
         input_manager->setMode(InputManager::MENU);
         int parent_pid;
@@ -2036,6 +2039,9 @@ int main(int argc, char *argv[] )
     if(wiimote_manager)
         delete wiimote_manager;
 #endif
+
+    if(focus_device_manager)
+        delete focus_device_manager;
 
     // If the window was closed in the middle of a race, remove players,
     // so we don't crash later when StateManager tries to access input devices.

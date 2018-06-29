@@ -32,6 +32,7 @@
 #include "input/keyboard_device.hpp"
 #include "input/multitouch_device.hpp"
 #include "input/wiimote_manager.hpp"
+#include "input/focus_device_manager.hpp"
 #include "karts/controller/controller.hpp"
 #include "karts/abstract_kart.hpp"
 #include "modes/demo_world.hpp"
@@ -90,7 +91,6 @@ void InputManager::update(float dt)
 #ifdef ENABLE_WIIUSE
     wiimote_manager->update();
 #endif
-
     if(m_timer_in_use)
     {
         m_timer -= dt;
@@ -575,6 +575,7 @@ void InputManager::inputSensing(Input::InputType type, int deviceID,
         case Input::IT_NONE:
         case Input::IT_MOUSEMOTION:
         case Input::IT_MOUSEBUTTON:
+        case Input::IT_FOCUS:
             // uninteresting (but we keep them here to explicitely state we do
             // nothing with them, and thus to fix warnings)
             break;
@@ -704,7 +705,7 @@ void InputManager::dispatchInput(Input::InputType type, int deviceID,
             player = NULL;
         }
     }
-
+    
     // do something with the key if it matches a binding
     if (action_found)
     {
@@ -790,6 +791,8 @@ void InputManager::dispatchInput(Input::InputType type, int deviceID,
              !GUIEngine::ScreenKeyboard::isActive()                &&
              !race_manager->isWatchingReplay() )
         {
+            Log::info("Input Manager", "Input from type %d, deviceId %d, button %d, value %d, action %d",
+             type, deviceID, button, value, action);
             if (player == NULL)
             {
                 // Prevent null pointer crash
@@ -997,6 +1000,12 @@ EventPropagation InputManager::input(const SEvent& event)
             gp->setButtonPressed(i, isButtonPressed);
         }
 
+    }
+    else if (event.EventType == EET_USER_EVENT)
+    {
+        Log::info("InputManager", "user event: UserData1 %d, UserData2 %d", event.UserEvent.UserData1, event.UserEvent.UserData2);
+        dispatchInput(Input::IT_FOCUS, event.UserEvent.UserData1, 0,
+                      Input::AD_POSITIVE, event.UserEvent.UserData2);
     }
     else if (event.EventType == EET_KEY_INPUT_EVENT)
     {

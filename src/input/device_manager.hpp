@@ -22,10 +22,13 @@
 #include "input/gamepad_config.hpp"
 #include "input/input_manager.hpp"
 #include "input/keyboard_config.hpp"
+#include "input/focus_config.hpp"
 #include "states_screens/state_manager.hpp"
 #include "utils/no_copy.hpp"
 #include "utils/ptr_vector.hpp"
 
+#include "fusi_sdk.h"
+#include <vector>
 #include <irrArray.h>
 #include <IEventReceiver.h>
 using namespace irr;
@@ -35,6 +38,7 @@ class InputDevice;
 class GamePadDevice;
 class KeyboardDevice;
 class MultitouchDevice;
+class FocusDevice;
 
 
 enum PlayerAssignMode
@@ -69,6 +73,11 @@ private:
     PtrVector<GamepadConfig, HOLD>     m_gamepad_configs;
     MultitouchDevice*                  m_multitouch_device;
 
+    /** For supporting BrainCo Focus device **/
+    PtrVector<FocusDevice, HOLD>        m_focus_devices;
+    PtrVector<FocusConfig, HOLD>        m_focus_configs;
+    bool                                m_focus_device_enabled;
+
     /** The list of all joysticks that were found and activated. */
     core::array<SJoystickInfo>         m_irrlicht_gamepads;
     InputDevice*                       m_latest_used_device;
@@ -95,6 +104,12 @@ private:
                                   InputManager::InputDriverMode mode,
                                   StateManager::ActivePlayer **player /* out */,
                                   PlayerAction *action /* out */);
+    InputDevice *mapFocusDeviceInput(int deviceID,
+                                  int btnID,
+                                  int *value,
+                                  InputManager::InputDriverMode mode,
+                                  StateManager::ActivePlayer **player /* out */,
+                                  PlayerAction *action /* out */);
 
     bool load();
     void shutdown();
@@ -109,6 +124,16 @@ public:
     PlayerAssignMode    getAssignMode() const               { return m_assign_mode; }
     void                setAssignMode(const PlayerAssignMode assignMode);
 
+    // ---- Focus ----
+    void                addFocusDevice(FocusDevice* d);
+    int getFocusDeviceAmount() const                        { return m_focus_devices.size(); }
+    int getFocusConfigAmount() const                        { return m_focus_configs.size(); }
+    FocusDevice*        getFocusDevice(const int i)          { return m_focus_devices.get(i); }
+    FocusConfig*        getFocusConfig(const int i)          { return m_focus_configs.get(i); }
+    void                clearFocusDevices();
+    bool                getConfigForFocusDevice(const int sdl_id, 
+                                                const std::string& name,
+                                                FocusConfig **config);
     // ---- Gamepads ----
     void addGamepad(GamePadDevice* d);
     int getGamePadAmount() const                            { return m_gamepads.size(); }

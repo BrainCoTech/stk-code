@@ -30,6 +30,7 @@
 #include "utils/string_utils.hpp"
 #include "utils/translation.hpp"
 #include "input/wiimote_manager.hpp"
+#include "input/focus_device_manager.hpp"
 
 #include <IGUIStaticText.h>
 #include <IGUIEnvironment.h>
@@ -49,9 +50,9 @@ AddDeviceDialog::AddDeviceDialog() : ModalDialog(0.90f, 0.80f)
     const int buttonHeight = textHeight + 10;
 
 #ifdef ENABLE_WIIUSE
-    const int nbButtons = 3;
+    const int nbButtons = 4;
 #else
-    const int nbButtons = 2;
+    const int nbButtons = 3;
 #endif
 
     const int y_bottom = m_area.getHeight() - nbButtons*(buttonHeight + 10) - 10;
@@ -102,7 +103,25 @@ AddDeviceDialog::AddDeviceDialog() : ModalDialog(0.90f, 0.80f)
         cur_y += y_stride;
     }
 #endif  // ENABLE_WIIUSE
+    {
+        ButtonWidget* widget = new ButtonWidget();
+        widget->m_properties[PROP_ID] = "addfocusdevice";
 
+        //I18N: In the 'add new input device' dialog
+        widget->setText( _("Add Focus Device") );
+
+        const int textWidth =
+            font->getDimension( widget->getText().c_str() ).Width + 40;
+
+        widget->m_x = m_area.getWidth()/2 - textWidth/2;
+        widget->m_y = cur_y;
+        widget->m_w = textWidth;
+        widget->m_h = buttonHeight;
+        widget->setParent(m_irrlicht_window);
+        m_widgets.push_back(widget);
+        widget->add();
+        cur_y += y_stride;
+    }
     {
         ButtonWidget* widget = new ButtonWidget();
         widget->m_properties[PROP_ID] = "addkeyboard";
@@ -184,6 +203,13 @@ GUIEngine::EventPropagation AddDeviceDialog::processEvent
         return GUIEngine::EVENT_BLOCK;
     }
 #endif
+    else if (eventSource == "addfocusdevice")
+    {
+        // Remove the previous modal dialog to avoid a warning
+        GUIEngine::ModalDialog::dismiss();
+        focus_device_manager->askUserToConnectFocusDevices();
 
+        return GUIEngine::EVENT_BLOCK;
+    }
     return GUIEngine::EVENT_LET;
 }   // processEvent

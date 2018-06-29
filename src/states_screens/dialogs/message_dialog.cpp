@@ -134,6 +134,12 @@ void MessageDialog::loadedFromFile()
         IconButtonWidget* yesbtn = getWidget<IconButtonWidget>("confirm");
         yesbtn->setText(_("OK"));
     }
+    else if (m_type == MessageDialog::MESSAGE_DIALOG_WAIT)
+    {
+        // In case of a WAIT dialog, hide the "Yes" button
+        IconButtonWidget* yesbtn = getWidget<IconButtonWidget>("confirm");
+         yesbtn->setVisible(false);
+    }
 }
 
 // ----------------------------------------------------------------------------

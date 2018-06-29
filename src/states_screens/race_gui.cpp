@@ -1076,25 +1076,6 @@ void RaceGUI::drawLap(const AbstractKart* kart,
 
 } // drawLap
 
-static void on_device_found(FusiDeviceInfo* device, int length, FusiError* error)
-{
-    if(length < 0){
-        printf("errorcode : %d\n", length);
-    }
-    else if(length == 0){
-        printf("no device found\n");
-    }
-    else{
-        printf("found [%d] devices\n", length);
-        for(int i = 0; i < length; i++){
-            printf("device ip[%s] mac[%s] name[%s]\n", device[i].ip, device[i].mac, device[i].name);
-        }
-    }
-}
-
-
-
 void RaceGUI::drawFocusScore()
 {
-    fusi_devices_search(on_device_found, 1000);
 }

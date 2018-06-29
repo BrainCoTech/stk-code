@@ -59,7 +59,8 @@ struct Input
         IT_STICKBUTTON,
         //IT_STICKHAT,
         IT_MOUSEMOTION,
-        IT_MOUSEBUTTON
+        IT_MOUSEBUTTON,
+        IT_FOCUS
     };
     static const int IT_LAST = IT_MOUSEBUTTON;
 
