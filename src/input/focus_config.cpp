@@ -59,23 +59,7 @@ void FocusConfig::save(std::ofstream& stream)
 
 void FocusConfig::setDefaultBinds()
 {
-    setBinding(PA_NITRO,       Input::IT_FOCUS, IRR_KEY_N);
-    setBinding(PA_ACCEL,       Input::IT_FOCUS, IRR_KEY_UP);
-    setBinding(PA_BRAKE,       Input::IT_FOCUS, IRR_KEY_DOWN);
-    setBinding(PA_STEER_LEFT,  Input::IT_FOCUS, IRR_KEY_LEFT);
-    setBinding(PA_STEER_RIGHT, Input::IT_FOCUS, IRR_KEY_RIGHT);
-    setBinding(PA_DRIFT,       Input::IT_FOCUS, IRR_KEY_V);
-    setBinding(PA_RESCUE,      Input::IT_FOCUS, IRR_KEY_BACK);
-    setBinding(PA_FIRE,        Input::IT_FOCUS, IRR_KEY_SPACE);
-    setBinding(PA_LOOK_BACK,   Input::IT_FOCUS, IRR_KEY_B);
-    setBinding(PA_PAUSE_RACE,  Input::IT_FOCUS, IRR_KEY_ESCAPE);
-
-    setBinding(PA_MENU_UP,     Input::IT_FOCUS, IRR_KEY_UP);
-    setBinding(PA_MENU_DOWN,   Input::IT_FOCUS, IRR_KEY_DOWN);
-    setBinding(PA_MENU_LEFT,   Input::IT_FOCUS, IRR_KEY_LEFT);
-    setBinding(PA_MENU_RIGHT,  Input::IT_FOCUS, IRR_KEY_RIGHT);
-    setBinding(PA_MENU_SELECT, Input::IT_FOCUS, IRR_KEY_RETURN);
-    setBinding(PA_MENU_CANCEL, Input::IT_FOCUS, IRR_KEY_ESCAPE);
+    //Bindings are not set
 }
 
 //------------------------------------------------------------------------------

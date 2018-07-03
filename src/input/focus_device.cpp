@@ -59,7 +59,7 @@ bool FocusDevice::processAndMapInput(Input::InputType type,  const int id,
     if (mode == InputManager::INGAME)
     {
         //return m_configuration->getGameAction(Input::IT_FOCUS, id, value, action);
-        *action = PlayerAction(PA_ACCEL);
+        *action = PlayerAction(PA_FOCUS);
         *value = int(Input::MAX_VALUE * (*value) / 100);
         return true;
     }

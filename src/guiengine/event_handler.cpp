@@ -392,6 +392,8 @@ void EventHandler::processGUIAction(const PlayerAction action,
                 onWidgetActivated( w, playerID );
             }
             break;
+        case PA_FOCUS:
+            break;
         default:
             return;
     }

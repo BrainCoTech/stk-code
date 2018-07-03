@@ -113,6 +113,9 @@ public:
     // ------------------------------------------------------------------------
     /** Returns the kart controlled by this controller. */
     AbstractKart *getKart() const { return m_kart; }
+    // ------------------------------------------------------------------------
+    /** Returns the focus value. */
+    virtual int getFocusValue() const { return -1; };
 };   // Controller
 
 extern Translations* translations;

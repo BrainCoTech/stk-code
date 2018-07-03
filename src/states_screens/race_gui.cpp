@@ -305,6 +305,7 @@ void RaceGUI::renderPlayerView(const Camera *camera, float dt)
     {
         drawPowerupIcons(kart, viewport, scaling);
         drawSpeedEnergyRank(kart, viewport, scaling, dt);
+        drawFocusMeter(kart, viewport, scaling, dt);
     }
 
     if (!m_is_tutorial)
@@ -801,7 +802,6 @@ void RaceGUI::drawSpeedEnergyRank(const AbstractKart* kart,
     drawEnergyMeter(viewport.LowerRightCorner.X ,
                     (int)(viewport.LowerRightCorner.Y),
                     kart, viewport, scaling);
-    drawFocusScore();
 
     // First draw the meter (i.e. the background )
     // -------------------------------------------------------------------------
@@ -1076,6 +1076,83 @@ void RaceGUI::drawLap(const AbstractKart* kart,
 
 } // drawLap
 
-void RaceGUI::drawFocusScore()
+void RaceGUI::drawFocusMeter(const AbstractKart* kart,
+                             const core::recti &viewport,
+                             const core::vector2df &scaling,
+                             float dt)
 {
+#ifndef SERVER_ONLY
+    float min_ratio        = std::min(scaling.X, scaling.Y);
+    const int GAUGEWIDTH   = 94;
+    int gauge_width        = (int)(GAUGEWIDTH*min_ratio);
+    int gauge_height       = (int)(GAUGEWIDTH*min_ratio);
+
+    float focusValue = (kart->getController())->getFocusValue();
+    float focusRatio = focusValue/(float)(Input::MAX_VALUE);
+    int focusScore = (int)(focusRatio * 100);
+    Log::info("Race gui","%f", focusRatio);
+
+    core::vector2df offset;
+    offset.X = (float)(viewport.LowerRightCorner.X-gauge_width) - 44.0f*scaling.X;
+    offset.Y = viewport.LowerRightCorner.Y-300.0f*scaling.Y;
+
+    // Background
+    draw2DImage(m_focus_empty, core::rect<s32>((int)offset.X,
+                                               (int)offset.Y - gauge_height,
+                                               (int)offset.X + gauge_width,
+                                               (int)offset.Y) /* dest rect */,
+                core::rect<s32>(core::position2d<s32>(0,0),
+                                m_focus_empty->getSize()) /* source rect */,
+                NULL /* clip rect */, NULL /* colors */,
+                true /* alpha */);
+
+    core::rect<s32> clipRec = core::rect<s32>((int)offset.X,
+                                               (int)offset.Y - gauge_height*focusRatio,
+                                               (int)offset.X + gauge_width,
+                                               (int)offset.Y);
+    video::ITexture *focus_texture;
+    if(focusScore<=20){
+        focus_texture = m_focus_20_full;
+    } else if(focusScore<=40){
+        focus_texture = m_focus_40_full;
+    } else if(focusScore<=60){
+        focus_texture = m_focus_60_full;
+    } else if(focusScore<=80){
+        focus_texture = m_focus_80_full;
+    } else if(focusScore<=100){
+        focus_texture = m_focus_100_full;
+    }
+    draw2DImage(focus_texture, core::rect<s32>((int)offset.X,
+                                               (int)offset.Y - gauge_height,
+                                               (int)offset.X + gauge_width,
+                                               (int)offset.Y) /* dest rect */,
+                core::rect<s32>(core::position2d<s32>(0,0),
+                                focus_texture->getSize()) /* source rect */,
+                &clipRec /* clip rect */, NULL /* colors */,
+                true /* alpha */);
+
+    drawFocusScore(focusScore, offset, min_ratio, gauge_width, gauge_height, dt);
+#endif
 }
+
+void RaceGUI::drawFocusScore(int focusScore,
+                      const core::vector2df &offset,
+                      float min_ratio, int gauge_width,
+                      int gauge_height, float dt)
+{
+    gui::ScalableFont* font = GUIEngine::getHighresDigitFont();
+    font->setScale(min_ratio);
+    font->setShadow(video::SColor(255, 128, 0, 0));
+    std::ostringstream oss;
+    oss << focusScore; // the current font has no . :(   << ".";
+
+    core::recti pos;
+    pos.LowerRightCorner = core::vector2di(int(offset.X + 0.64f*gauge_width),
+                                           int(offset.Y - 0.49f*gauge_height));
+    pos.UpperLeftCorner = core::vector2di(int(offset.X + 0.64f*gauge_width),
+                                          int(offset.Y - 0.49f*gauge_height));
+
+    static video::SColor color = video::SColor(255, 255, 255, 255);
+    font->draw(oss.str().c_str(), pos, color, true, true);
+    font->setScale(1.0f);
+}   // drawFocusScore

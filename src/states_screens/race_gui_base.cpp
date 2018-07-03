@@ -98,6 +98,13 @@ RaceGUIBase::RaceGUIBase()
     m_dist_show_overlap     = 2;
     m_icons_inertia         = 2;
 
+    m_focus_20_full         = irr_driver->getTexture(file_manager->getAsset(FileManager::GUI,"focus_20_full.png"));
+    m_focus_40_full         = irr_driver->getTexture(file_manager->getAsset(FileManager::GUI,"focus_40_full.png"));
+    m_focus_60_full         = irr_driver->getTexture(file_manager->getAsset(FileManager::GUI,"focus_60_full.png"));
+    m_focus_80_full         = irr_driver->getTexture(file_manager->getAsset(FileManager::GUI,"focus_80_full.png"));
+    m_focus_100_full        = irr_driver->getTexture(file_manager->getAsset(FileManager::GUI,"focus_100_full.png"));
+    m_focus_empty           = irr_driver->getTexture(file_manager->getAsset(FileManager::GUI,"focus_empty.png"));
+
     m_referee               = NULL;
     m_multitouch_gui        = NULL;
 }   // RaceGUIBase

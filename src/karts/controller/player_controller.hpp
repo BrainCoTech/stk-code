@@ -32,6 +32,8 @@ protected:
     bool           m_prev_brake;
     bool           m_prev_nitro;
 
+    int            m_focus_val;
+
     int            m_penalty_ticks;
 
     virtual void  steer(int ticks, int steer_val);
@@ -95,6 +97,7 @@ public:
     /** Returns the name of the player profile. */
     core::stringw getName() const OVERRIDE;
 
+    int getFocusValue() const OVERRIDE { return m_focus_val; }
 };   // class PlayerController
 
 #endif // HEADER_PLAYER_CONTROLLER_HPP

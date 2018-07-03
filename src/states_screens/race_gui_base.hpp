@@ -180,6 +180,15 @@ protected:
 
     video::ITexture *m_gauge_goal;
 
+
+    /** Textures for focus gauge. */
+    video::ITexture *m_focus_empty;
+    video::ITexture *m_focus_20_full;
+    video::ITexture *m_focus_40_full;
+    video::ITexture *m_focus_60_full;
+    video::ITexture *m_focus_80_full;
+    video::ITexture *m_focus_100_full;
+
     /** The frame around player karts in the mini map. */
     video::ITexture* m_icons_frame;
     

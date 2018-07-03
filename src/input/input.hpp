@@ -136,7 +136,9 @@ enum PlayerAction
     PA_MENU_SELECT,
     PA_MENU_CANCEL,
 
-    PA_COUNT
+    PA_COUNT,
+    
+    PA_FOCUS
 };
 
 const PlayerAction PA_FIRST_GAME_ACTION = PA_STEER_LEFT;

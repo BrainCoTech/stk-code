@@ -232,6 +232,23 @@ bool PlayerController::action(PlayerAction action, int value, bool dry_run)
     case PA_PAUSE_RACE:
         if (value != 0) StateManager::get()->escapePressed();
         break;
+    case PA_FOCUS:
+        SET_OR_TEST(m_focus_val, value);
+        // This part is copied from PA_ACCEL
+        SET_OR_TEST(m_prev_accel, value);
+        if (value && !(m_penalty_ticks > 0))
+        {
+            SET_OR_TEST_GETTER(Accel, value/32768.0f);
+            SET_OR_TEST_GETTER(Brake, false);
+            SET_OR_TEST_GETTER(Nitro, m_prev_nitro);
+        }
+        else
+        {
+            SET_OR_TEST_GETTER(Accel, 0.0f);
+            SET_OR_TEST_GETTER(Brake, m_prev_brake);
+            SET_OR_TEST_GETTER(Nitro, false);
+        }
+        break;
     default:
        break;
     }
