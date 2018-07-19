@@ -28,10 +28,20 @@ static void on_device_attention_callback(const char* device_mac, double attentio
     input_manager->input(event);
 }
 
+static void on_eeg_stats_callback(const char* device_mac, EEGStats* stats){
+    irr::SEvent event;
+    event.EventType = irr::EET_USER_EVENT;
+    event.UserEvent.UserData1 = focus_device_manager->getDeviceIdFromMac(device_mac);
+    Log::warn("Focus device manager","lowbeta[%f] theta[%f] result[%f]", stats->low_beta, stats->theta, stats->low_beta*200/stats->theta);
+    event.UserEvent.UserData2 = (int)(stats->low_beta*200/stats->theta);
+    input_manager->input(event);
+}
+
 void FocusDevice::connectDevice(){
     Log::info("Focus device manager","start connecting %s %s", m_focus_device_info->mac, m_focus_device_info->ip);
     FusiDevice* fusiDevice = fusi_device_create(*m_focus_device_info);
-    set_attention_callback(fusiDevice, on_device_attention_callback);
+    //set_attention_callback(fusiDevice, on_device_attention_callback);
+    set_eeg_stats_callback(fusiDevice, on_eeg_stats_callback);
     fusi_connect(fusiDevice, on_device_connect_callback, 1);
 }
 // ----------------------------------------------------------------------------

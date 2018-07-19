@@ -170,6 +170,7 @@ bool PlayerController::action(PlayerAction action, int value, bool dry_run)
 
         break;
     case PA_ACCEL:
+        Log::warn("player controller","[%s] keyboard accel %d", getName().c_str(), value);
         SET_OR_TEST(m_prev_accel, value);
         if (value && !(m_penalty_ticks > 0))
         {
@@ -233,6 +234,7 @@ bool PlayerController::action(PlayerAction action, int value, bool dry_run)
         if (value != 0) StateManager::get()->escapePressed();
         break;
     case PA_FOCUS:
+        Log::warn("player controller","[%s] focus accel %d",getName().c_str(), value);
         SET_OR_TEST(m_focus_val, value);
         // This part is copied from PA_ACCEL
         SET_OR_TEST(m_prev_accel, value);
