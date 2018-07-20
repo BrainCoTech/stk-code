@@ -485,7 +485,8 @@ InputDevice *DeviceManager::mapGamepadInput(Input::InputType type,
 // -----------------------------------------------------------------------------
 /** Helper method, only used internally. Takes care of analyzing focus device input.
  */
-InputDevice* DeviceManager::mapFocusDeviceInput(int device_id,
+InputDevice* DeviceManager::mapFocusDeviceInput(Input::InputType type,
+                                                int device_id,
                                                 int button_id,
                                                 int *value,
                                                 InputManager::InputDriverMode mode,
@@ -494,7 +495,7 @@ InputDevice* DeviceManager::mapFocusDeviceInput(int device_id,
 {
     FocusDevice *focusDevice = m_focus_devices.get(device_id);
 
-    if (focusDevice->processAndMapInput(Input::IT_FOCUS, device_id, mode, action, value))
+    if (focusDevice->processAndMapInput(type, device_id, mode, action, value))
     {
         if (m_single_player != NULL)
         {
@@ -580,8 +581,10 @@ bool DeviceManager::translateInput( Input::InputType type,
             }
             break;
         case Input::IT_FOCUS:
-            device = mapFocusDeviceInput(device_id, button_id, value,
+        case Input::IT_FOCUS_CONTACT:
+            device = mapFocusDeviceInput(type, device_id, button_id, value,
                                          mode, player, action);
+            break;
         default:
             break;
     };

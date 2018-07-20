@@ -116,6 +116,7 @@ public:
     // ------------------------------------------------------------------------
     /** Returns the focus value. */
     virtual int getFocusValue() const { return -1; };
+    virtual int getDeviceContactValue() const { return -1; };
 };   // Controller
 
 extern Translations* translations;

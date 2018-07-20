@@ -30,6 +30,39 @@ static void on_device_attention_callback(const char* device_mac, double attentio
     event.EventType = irr::EET_USER_EVENT;
     event.UserEvent.UserData1 = focus_device_manager->getDeviceIdFromMac(device_mac);
     event.UserEvent.UserData2 = attention;
+    event.UserEvent.type = 100;
+    input_manager->input(event);
+}
+
+static void on_device_connection_change_callback(const char* device_mac, DeviceConnectionState state)
+{
+    irr::SEvent event;
+    event.EventType = irr::EET_USER_EVENT;
+    event.UserEvent.UserData1 = focus_device_manager->getDeviceIdFromMac(device_mac);
+    if(state == 0)
+        event.UserEvent.UserData2 = 0;
+    else if(state == 1)
+        event.UserEvent.UserData2 = 1;
+    else
+        event.UserEvent.UserData2 = -1;
+    
+    event.UserEvent.type = Input::IT_FOCUS_CONTACT;
+    input_manager->input(event);
+}
+
+static void on_device_contact_state_change_callback(const char* device_mac, DeviceContactState state)
+{
+    irr::SEvent event;
+    event.EventType = irr::EET_USER_EVENT;
+    event.UserEvent.UserData1 = focus_device_manager->getDeviceIdFromMac(device_mac);
+    if(state == 0)
+        event.UserEvent.UserData2 = 3;
+    else if(state == 1)
+        event.UserEvent.UserData2 = 1;
+    else
+        event.UserEvent.UserData2 = 2;
+    
+    event.UserEvent.type = Input::IT_FOCUS_CONTACT;
     input_manager->input(event);
 }
 
@@ -52,6 +85,7 @@ static void on_eeg_stats_callback(const char* device_mac, EEGStats* stats){
         for(int i = 0;i<ATTENTION_BUFF_SIZE;i++) acc += attentionBuff[attentionBuffIndex]/ATTENTION_BUFF_SIZE;
     }
     event.UserEvent.UserData2 = (int)acc;
+    event.UserEvent.type = Input::IT_FOCUS;
     input_manager->input(event);
 }
 
@@ -60,7 +94,9 @@ void FocusDevice::connectDevice(){
     FusiDevice* fusiDevice = fusi_device_create(*m_focus_device_info);
     //set_attention_callback(fusiDevice, on_device_attention_callback);
     set_eeg_stats_callback(fusiDevice, on_eeg_stats_callback);
-    fusi_connect(fusiDevice, on_device_connect_callback, 1);
+    set_device_connection_callback(fusiDevice, on_device_connection_change_callback);
+    set_device_contact_state_callback(fusiDevice, on_device_contact_state_change_callback);
+    fusi_connect(fusiDevice, on_device_connection_change_callback, 1);
 }
 // ----------------------------------------------------------------------------
 /** Invoked when this device it used. Verifies if the key/button that was
@@ -86,9 +122,16 @@ bool FocusDevice::processAndMapInput(Input::InputType type,  const int id,
     // bindings can only be accessed in game
     if (mode == InputManager::INGAME)
     {
-        //return m_configuration->getGameAction(Input::IT_FOCUS, id, value, action);
-        *action = PlayerAction(PA_FOCUS);
-        *value = int(Input::MAX_VALUE * (*value) / 100);
+        if(type == Input::IT_FOCUS)
+        {
+            //return m_configuration->getGameAction(Input::IT_FOCUS, id, value, action);
+            *action = PlayerAction(PA_FOCUS);
+            *value = int(Input::MAX_VALUE * (*value) / 100);
+        }
+        else if(type == Input::IT_FOCUS_CONTACT)
+        {
+            *action = PlayerAction(PA_FOCUS_CONTACT);
+        }
         return true;
     }
     return false;

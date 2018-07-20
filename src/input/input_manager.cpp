@@ -705,6 +705,11 @@ void InputManager::dispatchInput(Input::InputType type, int deviceID,
             player = NULL;
         }
     }
+
+    if (action == PA_FOCUS_CONTACT)
+    {
+        m_device_contact_val = value;
+    }
     
     // do something with the key if it matches a binding
     if (action_found)
@@ -1004,7 +1009,11 @@ EventPropagation InputManager::input(const SEvent& event)
     else if (event.EventType == EET_USER_EVENT)
     {
         Log::info("InputManager", "user event: UserData1 %d, UserData2 %d", event.UserEvent.UserData1, event.UserEvent.UserData2);
-        dispatchInput(Input::IT_FOCUS, event.UserEvent.UserData1, 0,
+        if(event.UserEvent.type == Input::IT_FOCUS_CONTACT)
+            dispatchInput(Input::IT_FOCUS_CONTACT, event.UserEvent.UserData1, 0,
+                      Input::AD_POSITIVE, event.UserEvent.UserData2);
+        else if(event.UserEvent.type == Input::IT_FOCUS)
+            dispatchInput(Input::IT_FOCUS, event.UserEvent.UserData1, 0,
                       Input::AD_POSITIVE, event.UserEvent.UserData2);
     }
     else if (event.EventType == EET_KEY_INPUT_EVENT)

@@ -2582,7 +2582,7 @@ void Kart::updateEnginePowerAndBrakes(int ticks)
             m_kart_properties->getSkidVisualTime() == 0)
             engine_power *= 0.5f;
 
-        Log::warn("kart","[%f]apply engine force %f with accel %f",engine_power*m_controls.getAccel(), engine_power, m_controls.getAccel());
+        //Log::warn("kart","[%f]apply engine force %f with accel %f",engine_power*m_controls.getAccel(), engine_power, m_controls.getAccel());
         applyEngineForce(engine_power*m_controls.getAccel());
 
         // Either all or no brake is set, so test only one to avoid

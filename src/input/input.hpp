@@ -60,7 +60,8 @@ struct Input
         //IT_STICKHAT,
         IT_MOUSEMOTION,
         IT_MOUSEBUTTON,
-        IT_FOCUS
+        IT_FOCUS,
+        IT_FOCUS_CONTACT
     };
     static const int IT_LAST = IT_MOUSEBUTTON;
 
@@ -138,7 +139,9 @@ enum PlayerAction
 
     PA_COUNT,
     
-    PA_FOCUS
+    PA_FOCUS,
+
+    PA_FOCUS_CONTACT
 };
 
 const PlayerAction PA_FIRST_GAME_ACTION = PA_STEER_LEFT;

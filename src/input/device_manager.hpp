@@ -104,7 +104,8 @@ private:
                                   InputManager::InputDriverMode mode,
                                   StateManager::ActivePlayer **player /* out */,
                                   PlayerAction *action /* out */);
-    InputDevice *mapFocusDeviceInput(int deviceID,
+    InputDevice *mapFocusDeviceInput(Input::InputType type,
+                                    int deviceID,
                                   int btnID,
                                   int *value,
                                   InputManager::InputDriverMode mode,

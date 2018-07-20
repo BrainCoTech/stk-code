@@ -563,6 +563,9 @@ struct SEvent
 
 		//! Another user specified data as int
 		s32 UserData2;
+
+		//
+		int type;
 	};
 	
 	// Raw events from the OS

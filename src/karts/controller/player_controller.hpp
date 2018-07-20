@@ -20,6 +20,7 @@
 #define HEADER_PLAYER_CONTROLLER_HPP
 
 #include "karts/controller/controller.hpp"
+#include "input/input_manager.hpp"
 
 class AbstractKart;
 class Player;
@@ -33,6 +34,7 @@ protected:
     bool           m_prev_nitro;
 
     int            m_focus_val;
+    int            m_device_contact_val = -1;
 
     int            m_penalty_ticks;
 
@@ -98,6 +100,7 @@ public:
     core::stringw getName() const OVERRIDE;
 
     int getFocusValue() const OVERRIDE { return m_focus_val; }
+    int getDeviceContactValue() const OVERRIDE { return input_manager->getDeviceContactValue(); }
 };   // class PlayerController
 
 #endif // HEADER_PLAYER_CONTROLLER_HPP

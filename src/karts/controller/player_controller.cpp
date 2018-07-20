@@ -43,6 +43,8 @@ PlayerController::PlayerController(AbstractKart *kart)
                 : Controller(kart)
 {
     m_penalty_ticks = 0;
+    m_focus_val = 0;
+    m_device_contact_val = -1;
 }   // PlayerController
 
 //-----------------------------------------------------------------------------
@@ -233,8 +235,18 @@ bool PlayerController::action(PlayerAction action, int value, bool dry_run)
     case PA_PAUSE_RACE:
         if (value != 0) StateManager::get()->escapePressed();
         break;
+    case PA_FOCUS_CONTACT:
+        Log::warn("player controller","[%s] contact state %d",getName().c_str(), value);
+        SET_OR_TEST(m_device_contact_val, value);
+        if(value < 3){
+            SET_OR_TEST(m_focus_val, 0);
+            // This part is copied from PA_ACCEL
+            SET_OR_TEST(m_prev_accel, 0);
+            SET_OR_TEST_GETTER(Accel, 0.0f);
+        }
+        break;
     case PA_FOCUS:
-        Log::warn("player controller","[%s] focus accel %d",getName().c_str(), value);
+        //Log::warn("player controller","[%s] focus accel %d",getName().c_str(), value);
         SET_OR_TEST(m_focus_val, value);
         // This part is copied from PA_ACCEL
         SET_OR_TEST(m_prev_accel, value);
