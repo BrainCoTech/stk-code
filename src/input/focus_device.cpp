@@ -2,6 +2,11 @@
 #include "input/focus_device_manager.hpp"
 #include "input/focus_config.hpp"
 #include "fusi_sdk.h"
+
+#define ATTENTION_BUFF_SIZE 10
+bool attentionStartFlag = false;
+int attentionBuff[] = {0,0,0,0,0,0,0,0,0,0};
+int attentionBuffIndex = 0;
 // ----------------------------------------------------------------------------
 FocusDevice::FocusDevice(const int focus_device_id, FusiDeviceInfo* focus_device_info,
                          FocusConfig *configuration)
@@ -33,7 +38,20 @@ static void on_eeg_stats_callback(const char* device_mac, EEGStats* stats){
     event.EventType = irr::EET_USER_EVENT;
     event.UserEvent.UserData1 = focus_device_manager->getDeviceIdFromMac(device_mac);
     Log::warn("Focus device manager","lowbeta[%f] theta[%f] result[%f]", stats->low_beta, stats->theta, stats->low_beta*200/stats->theta);
-    event.UserEvent.UserData2 = (int)(stats->low_beta*200/stats->theta);
+    double newAcc =  stats->low_beta*250/(stats->theta + stats ->alpha);
+    if(newAcc > 100.0) newAcc = 100.0;
+    attentionBuff[attentionBuffIndex++] = newAcc;
+    if(attentionBuffIndex == ATTENTION_BUFF_SIZE) {
+        attentionBuffIndex = 0;
+        if(!attentionStartFlag) attentionStartFlag = true;
+    }
+    double acc = 0;
+    if(!attentionStartFlag) {
+        for(int i = 0;i<=attentionBuffIndex;i++) acc += attentionBuff[attentionBuffIndex]/(attentionBuffIndex + 1);
+    } else{
+        for(int i = 0;i<ATTENTION_BUFF_SIZE;i++) acc += attentionBuff[attentionBuffIndex]/ATTENTION_BUFF_SIZE;
+    }
+    event.UserEvent.UserData2 = (int)acc;
     input_manager->input(event);
 }
 
