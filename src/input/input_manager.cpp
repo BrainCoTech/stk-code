@@ -83,6 +83,7 @@ InputManager::InputManager() : m_mode(BOOTSTRAP),
     m_timer_in_use = false;
     m_master_player_only = false;
     m_timer = 0;
+    m_device_contact_val = -1;
 
 }
 // -----------------------------------------------------------------------------
@@ -622,6 +623,12 @@ void InputManager::dispatchInput(Input::InputType type, int deviceID,
                                  Input::AxisDirection axisDirection, int value,
                                  bool shift_mask)
 {
+    if (type == Input::IT_FOCUS_CONTACT)
+    {
+        Log::warn("input manager","contact state change to%d", value);
+        m_device_contact_val = value;
+    }
+    Log::warn("input manager","begin dispatch input");
     // Act different in input sensing mode.
     if (m_mode == INPUT_SENSE_KEYBOARD ||
         m_mode == INPUT_SENSE_GAMEPAD)
@@ -704,11 +711,6 @@ void InputManager::dispatchInput(Input::InputType type, int deviceID,
             action_found = true;
             player = NULL;
         }
-    }
-
-    if (action == PA_FOCUS_CONTACT)
-    {
-        m_device_contact_val = value;
     }
     
     // do something with the key if it matches a binding
@@ -796,7 +798,7 @@ void InputManager::dispatchInput(Input::InputType type, int deviceID,
              !GUIEngine::ScreenKeyboard::isActive()                &&
              !race_manager->isWatchingReplay() )
         {
-            Log::info("Input Manager", "Input from type %d, deviceId %d, button %d, value %d, action %d",
+            Log::warn("Input Manager", "Input from type %d, deviceId %d, button %d, value %d, action %d",
              type, deviceID, button, value, action);
             if (player == NULL)
             {

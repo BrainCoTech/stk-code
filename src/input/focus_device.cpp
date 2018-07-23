@@ -118,7 +118,6 @@ bool FocusDevice::processAndMapInput(Input::InputType type,  const int id,
                                         InputManager::InputDriverMode mode,
                                         PlayerAction *action, int* value)
 {
-    assert(type==Input::IT_FOCUS);
     // bindings can only be accessed in game
     if (mode == InputManager::INGAME)
     {
@@ -128,10 +127,12 @@ bool FocusDevice::processAndMapInput(Input::InputType type,  const int id,
             *action = PlayerAction(PA_FOCUS);
             *value = int(Input::MAX_VALUE * (*value) / 100);
         }
-        else if(type == Input::IT_FOCUS_CONTACT)
-        {
-            *action = PlayerAction(PA_FOCUS_CONTACT);
-        }
+        return true;
+    }
+
+    if(type == Input::IT_FOCUS_CONTACT)
+    {
+        *action = PlayerAction(PA_FOCUS_CONTACT);
         return true;
     }
     return false;
