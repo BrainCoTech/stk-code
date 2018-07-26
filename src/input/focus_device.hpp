@@ -17,6 +17,7 @@ private:
     /** Index of this element the arrays of focus devices */
     int             m_focus_device_id;
     FusiDeviceInfo* m_focus_device_info;
+    FusiDevice*     m_focus_device;
 public:
     FocusDevice(const int focus_device_id, FusiDeviceInfo* focus_device_info,
                 FocusConfig* configuration);
@@ -27,6 +28,7 @@ public:
                                     PlayerAction *action, int* value = NULL
                                     ) OVERRIDE;
     void connectDevice();
+    void disconnectDevice();
     
     int getFocusDeviceId() { return m_focus_device_id; }
     const char* getFocusDeviceMac() { return m_focus_device_info->mac; }

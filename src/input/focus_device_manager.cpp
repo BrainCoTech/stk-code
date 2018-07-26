@@ -93,8 +93,8 @@ static void on_focus_search_done(FusiDeviceInfo* device, int length, FusiError* 
                                         );
             if(std::strncmp(device[id].name, "F1EDU_040A", 10) == 0)
             {
-                Log::info("Focus device manager","hahahahahhahahahahahahahah");
-                focusDevice->connectDevice();
+                //Log::info("Focus device manager","hahahahahhahahahahahahahah");
+                //focusDevice->connectDevice();
             }
             device_manager->addFocusDevice(focusDevice);
         }

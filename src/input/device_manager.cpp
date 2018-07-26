@@ -48,6 +48,7 @@ DeviceManager::DeviceManager()
     m_assign_mode = NO_ASSIGN;
     m_single_player = NULL;
     m_multitouch_device = NULL;
+    m_current_focus_device = NULL;
 }   // DeviceManager
 
 // -----------------------------------------------------------------------------

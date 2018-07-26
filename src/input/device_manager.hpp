@@ -23,6 +23,7 @@
 #include "input/input_manager.hpp"
 #include "input/keyboard_config.hpp"
 #include "input/focus_config.hpp"
+#include "input/focus_device.hpp"
 #include "states_screens/state_manager.hpp"
 #include "utils/no_copy.hpp"
 #include "utils/ptr_vector.hpp"
@@ -127,6 +128,7 @@ public:
 
     // ---- Focus ----
     void                addFocusDevice(FocusDevice* d);
+    FocusDevice*                        m_current_focus_device;
     int getFocusDeviceAmount() const                        { return m_focus_devices.size(); }
     int getFocusConfigAmount() const                        { return m_focus_configs.size(); }
     FocusDevice*        getFocusDevice(const int i)          { return m_focus_devices.get(i); }

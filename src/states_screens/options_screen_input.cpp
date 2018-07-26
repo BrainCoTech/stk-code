@@ -298,11 +298,21 @@ void OptionsScreenInput::eventCallback(Widget* widget, const std::string& name, 
         }
         else if (selection.find("focus_device") != std::string::npos)
         {
+            Log::warn("OptionsScreenInput", "[%s] device touched [%s]",selection.c_str(), name.c_str());
             int i = -1, read = 0;
             read = sscanf( selection.c_str(), "focus_device%i", &i );
             if (read == 1 && i != -1)
             {
+                DeviceManager* dm = input_manager->getDeviceManager();
                 // updateInputButtons( input_manager->getDeviceList()->getKeyboardConfig(i) );
+                if(dm->m_current_focus_device != NULL)
+                {
+                    dm->m_current_focus_device->disconnectDevice();
+                    dm->m_current_focus_device = NULL;
+                }
+
+                dm->m_current_focus_device = input_manager->getDeviceManager()->getFocusDevice(i);
+                dm->m_current_focus_device->connectDevice();
                 OptionsScreenDevice::getInstance()
                     ->setDevice( input_manager->getDeviceManager()->getFocusConfig(i) );
                 StateManager::get()->replaceTopMostScreen(OptionsScreenDevice::getInstance());

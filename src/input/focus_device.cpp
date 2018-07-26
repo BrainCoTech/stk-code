@@ -13,6 +13,7 @@ FocusDevice::FocusDevice(const int focus_device_id, FusiDeviceInfo* focus_device
 {
     m_focus_device_id = focus_device_id;
     m_focus_device_info = focus_device_info;
+    m_focus_device  = NULL;
     m_configuration = configuration;
     m_type          = DT_FOCUS;
     m_name          = "Focus";
@@ -91,13 +92,19 @@ static void on_eeg_stats_callback(const char* device_mac, EEGStats* stats){
 
 void FocusDevice::connectDevice(){
     Log::info("Focus device manager","start connecting %s %s", m_focus_device_info->mac, m_focus_device_info->ip);
-    FusiDevice* fusiDevice = fusi_device_create(*m_focus_device_info);
-    //set_attention_callback(fusiDevice, on_device_attention_callback);
-    set_eeg_stats_callback(fusiDevice, on_eeg_stats_callback);
-    set_device_connection_callback(fusiDevice, on_device_connection_change_callback);
-    set_device_contact_state_callback(fusiDevice, on_device_contact_state_change_callback);
-    fusi_connect(fusiDevice, on_device_connection_change_callback, 1);
+    m_focus_device = fusi_device_create(*m_focus_device_info);
+    //set_attention_callback(m_focus_device, on_device_attention_callback);
+    set_eeg_stats_callback(m_focus_device, on_eeg_stats_callback);
+    set_device_connection_callback(m_focus_device, on_device_connection_change_callback);
+    set_device_contact_state_callback(m_focus_device, on_device_contact_state_change_callback);
+    fusi_connect(m_focus_device, on_device_connection_change_callback, 1);
 }
+
+void FocusDevice::disconnectDevice(){
+    if(m_focus_device != NULL)
+        fusi_disconnect(m_focus_device);
+}
+
 // ----------------------------------------------------------------------------
 /** Invoked when this device it used. Verifies if the key/button that was
  *  pressed is associated with a binding. If yes, sets action and returns
