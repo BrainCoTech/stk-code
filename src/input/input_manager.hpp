@@ -104,7 +104,11 @@ public:
     /** Returns the ID of the player that plays with the keyboard,
      *  or -1 if none. */
     int    getPlayerKeyboardID() const;
-    int getDeviceContactValue() const  { return m_device_contact_val; }
+    int getDeviceContactValue() const  { 
+        if(m_device_contact_val >= 3)
+            return 3;
+        else
+            return m_device_contact_val; }
 };
 
 extern InputManager *input_manager;

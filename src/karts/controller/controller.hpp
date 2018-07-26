@@ -115,7 +115,7 @@ public:
     AbstractKart *getKart() const { return m_kart; }
     // ------------------------------------------------------------------------
     /** Returns the focus value. */
-    virtual int getFocusValue() const { return -1; };
+    virtual int getFocusValue() { return -1; };
     virtual int getDeviceContactValue() const { return -1; };
 };   // Controller
 

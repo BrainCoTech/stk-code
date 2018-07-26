@@ -393,6 +393,30 @@ void EventHandler::processGUIAction(const PlayerAction action,
             }
             break;
         case PA_FOCUS:
+        case PA_FOCUS_CONTACT:
+        {
+            Log::warn("event handler","contact state change to [%d]", value); 
+            
+            Widget* w = GUIEngine::getFocusForPlayer(playerID);
+            if (w == NULL) break;
+            
+            onWidgetActivated( w, playerID, value);
+
+
+            //Widget* widget_to_call = w;
+            /* Find topmost parent. Stop looping if a widget event handler's is itself, to not fall
+             in an infinite loop (this can happen e.g. in checkboxes, where they need to be
+             notified of clicks onto themselves so they can toggle their state. )
+             On the way, also notify everyone in the chain of the right press */
+/*            while (widget_to_call->m_event_handler != NULL && widget_to_call->m_event_handler != widget_to_call)
+            {
+                std::string name = "contact_state";
+                Log::warn("event handler", "send event to user [%s] [%d]", name.c_str(), value);
+                sendEventToUser(widget_to_call, name, value);
+                widget_to_call = widget_to_call->m_event_handler;
+            }  
+*/
+        }
             break;
         default:
             return;
@@ -606,8 +630,9 @@ void EventHandler::sendEventToUser(GUIEngine::Widget* widget, std::string& name,
 
 // -----------------------------------------------------------------------------
 
-EventPropagation EventHandler::onWidgetActivated(GUIEngine::Widget* w, const int playerID)
+EventPropagation EventHandler::onWidgetActivated(GUIEngine::Widget* w, const int playerID, int value)
 {
+    Log::warn("event handler", "on widget activated [%d]", playerID);
     if (w->onActivationInput(playerID) == EVENT_BLOCK)
         return EVENT_BLOCK;
 
@@ -650,7 +675,12 @@ EventPropagation EventHandler::onWidgetActivated(GUIEngine::Widget* w, const int
          parent event handler says so */
         if (parent->transmitEvent(w, w->m_properties[PROP_ID], playerID) == EVENT_LET)
         {
-            sendEventToUser(parent, parent->m_properties[PROP_ID], playerID);
+            if(value != -1000){
+                std::string name = "contact_state";
+                sendEventToUser(parent, name, value);
+            }
+            else
+                sendEventToUser(parent, parent->m_properties[PROP_ID], playerID);
         }
     }
     else
@@ -660,6 +690,11 @@ EventPropagation EventHandler::onWidgetActivated(GUIEngine::Widget* w, const int
         if (w->transmitEvent(w, id, playerID) == EVENT_LET)
         {
             assert(w->ok());
+            if(value != -1000){
+                std::string name = "contact_state";
+                sendEventToUser(parent, name, value);
+            }
+            else
             sendEventToUser(w, id, playerID);
         }
     }

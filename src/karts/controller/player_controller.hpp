@@ -20,6 +20,7 @@
 #define HEADER_PLAYER_CONTROLLER_HPP
 
 #include "karts/controller/controller.hpp"
+#include "karts/controller/kart_control.hpp"
 #include "input/input_manager.hpp"
 
 class AbstractKart;
@@ -99,7 +100,16 @@ public:
     /** Returns the name of the player profile. */
     core::stringw getName() const OVERRIDE;
 
-    int getFocusValue() const OVERRIDE { return m_focus_val; }
+    int getFocusValue() OVERRIDE {
+        /*
+        if(input_manager->getDeviceContactValue() < 3){
+            m_controls->setAccel(0);  
+            m_focus_val = 0;
+            m_prev_accel = 0;
+        }*/
+
+        return m_focus_val;
+    }
     int getDeviceContactValue() const OVERRIDE { return input_manager->getDeviceContactValue(); }
 };   // class PlayerController
 

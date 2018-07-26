@@ -67,11 +67,26 @@ static void on_device_contact_state_change_callback(const char* device_mac, Devi
     input_manager->input(event);
 }
 
+static int calibration_begin = 0;
+static int calibration_end = 0;
+static int calibration_expected_num = 5;
+static int calibration_finished_num = 0;
+static int calibration_max = 0;
+static int calibration_min = 100;
+
+static void calibration_add(double value){
+    calibration_max = calibration_max > value? calibration_max:value;
+    calibration_min = calibration_min < value? calibration_min:value;
+    calibration_finished_num++;
+}
+
 static void on_eeg_stats_callback(const char* device_mac, EEGStats* stats){
     irr::SEvent event;
     event.EventType = irr::EET_USER_EVENT;
     event.UserEvent.UserData1 = focus_device_manager->getDeviceIdFromMac(device_mac);
     Log::warn("Focus device manager","lowbeta[%f] theta[%f] result[%f]", stats->low_beta, stats->theta, stats->low_beta*200/stats->theta);
+    
+    /*
     double newAcc =  stats->low_beta*250/(stats->theta + stats ->alpha);
     if(newAcc > 100.0) newAcc = 100.0;
     attentionBuff[attentionBuffIndex++] = newAcc;
@@ -88,6 +103,48 @@ static void on_eeg_stats_callback(const char* device_mac, EEGStats* stats){
     event.UserEvent.UserData2 = (int)acc;
     event.UserEvent.type = Input::IT_FOCUS;
     input_manager->input(event);
+    */
+
+    double newAcc =  stats->low_beta*250/(stats->theta + stats ->alpha);
+    if(newAcc > 100.0) newAcc = 100.0;
+    if(newAcc <= 1) newAcc = 1;
+    if(calibration_end > 0){
+        double current;
+        if(calibration_min + (calibration_max-calibration_min)*0.7 <= newAcc)
+            current = 100;
+        else if(newAcc <= calibration_min)
+            current = 0;
+        else{
+            current = 100*(newAcc - calibration_min)/((calibration_max-calibration_min)*0.7);
+        }
+
+        Log::warn("focus device", "calibration_min[%d] calibration_max[%d] new[%f] standardlized[%f]", calibration_min, calibration_max, newAcc, current);
+        event.UserEvent.UserData2 = (int)current;
+        event.UserEvent.type = Input::IT_FOCUS;
+        input_manager->input(event);
+    }
+    else if(calibration_begin > 0){
+        if(calibration_finished_num >= calibration_expected_num){
+            calibration_end = 1;
+            event.UserEvent.UserData2 = 5;
+            event.UserEvent.type = Input::IT_FOCUS_CONTACT;
+            input_manager->input(event);
+        }
+        else{
+            calibration_add(newAcc);
+            event.UserEvent.UserData2 = 4;
+            event.UserEvent.type = Input::IT_FOCUS_CONTACT;
+            input_manager->input(event);
+        }
+    }
+    else if(calibration_begin == 0){
+        calibration_begin = 1;
+        calibration_add(newAcc);
+        event.UserEvent.UserData2 = 4;
+        event.UserEvent.type = Input::IT_FOCUS_CONTACT;
+        input_manager->input(event);
+    }
+
 }
 
 void FocusDevice::connectDevice(){

@@ -50,6 +50,7 @@ using namespace GUIEngine;
 OptionsScreenDevice::OptionsScreenDevice() : Screen("options_device.stkgui")
 {
     m_config = NULL;
+    m_last_contact_state = 0;
 }   // OptionsScreenDevice
 
 // ----------------------------------------------------------------------------
@@ -507,7 +508,7 @@ void OptionsScreenDevice::eventCallback(Widget* widget,
                                        const int playerID)
 {
     //const std::string& screen_name = getName();
-
+    Log::warn("options screeen device", "event name [%s] playerID [%d]", name.c_str(), playerID);
     StateManager *sm = StateManager::get();
     if (name == "options_choice")
     {
@@ -592,11 +593,26 @@ void OptionsScreenDevice::eventCallback(Widget* widget,
             else                        m_config->setEnabled(true);
 
             // update widget label
-            ButtonWidget* delete_button = getWidget<ButtonWidget>("delete");
-            delete_button->setLabel(m_config->isEnabled() ? _("Disable Device")
-                                                      : _("Enable Device")  );
+            //ButtonWidget* delete_button = getWidget<ButtonWidget>("delete");
+            //delete_button->setLabel(m_config->isEnabled() ? _("Disable Device")
+            //                                          : _("Enable Device")  );
 
             input_manager->getDeviceManager()->save();
+        }
+    }
+
+    else if(name == "contact_state")
+    {
+        // update widget label
+        if(m_last_contact_state == 5){
+            Log::warn("options screen device", "contact state already reach to 5");
+        }
+        else{
+            std::ostringstream oss;
+            oss << playerID;
+            m_last_contact_state = playerID;
+            ButtonWidget* delete_button = getWidget<ButtonWidget>("delete");
+            delete_button->setLabel(oss.str().c_str());
         }
     }
 

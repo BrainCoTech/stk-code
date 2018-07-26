@@ -61,7 +61,7 @@ namespace GUIEngine
         bool m_accept_events;
         
         EventPropagation onGUIEvent(const irr::SEvent& event);
-        EventPropagation onWidgetActivated(Widget* w, const int playerID);
+        EventPropagation onWidgetActivated(Widget* w, const int playerID, int value = -1000);
         void navigate(const int playerID, Input::InputType type, const bool pressedDown, const bool reverse);
 
         /** \brief          send an event to the GUI module user's event callback

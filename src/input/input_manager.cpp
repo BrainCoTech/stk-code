@@ -618,6 +618,14 @@ int InputManager::getPlayerKeyboardID() const
  * Note: It is the obligation of the called menu to switch of the sense mode.
  *
  */
+#include "guiengine/widget.hpp"
+#include "guiengine/widgets/button_widget.hpp"
+#include "guiengine/widgets/label_widget.hpp"
+#include "guiengine/widgets/list_widget.hpp"
+#include "guiengine/widgets/ribbon_widget.hpp"
+
+using namespace GUIEngine;
+
 void InputManager::dispatchInput(Input::InputType type, int deviceID,
                                  int button,
                                  Input::AxisDirection axisDirection, int value,
@@ -625,10 +633,14 @@ void InputManager::dispatchInput(Input::InputType type, int deviceID,
 {
     if (type == Input::IT_FOCUS_CONTACT)
     {
-        Log::warn("input manager","contact state change to%d", value);
+        Log::warn("input manager","contact state change to [%d]", value);
         m_device_contact_val = value;
+        // update widget label
+        //ButtonWidget* delete_button = getWidget<ButtonWidget>("delete");
+        //std::ostringstream oss;
+        //oss << value;
+        //delete_button->setLabel(oss.str().c_str());
     }
-    Log::warn("input manager","begin dispatch input");
     // Act different in input sensing mode.
     if (m_mode == INPUT_SENSE_KEYBOARD ||
         m_mode == INPUT_SENSE_GAMEPAD)
