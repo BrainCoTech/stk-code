@@ -92,6 +92,10 @@ void InputManager::update(float dt)
 #ifdef ENABLE_WIIUSE
     wiimote_manager->update();
 #endif
+
+    // update focus device
+    focus_device_manager->update();
+
     if(m_timer_in_use)
     {
         m_timer -= dt;
@@ -827,7 +831,8 @@ void InputManager::dispatchInput(Input::InputType type, int deviceID,
                     "action for an unknown player");
                 return;
             }
-
+            Log::warn("Input Manager", "Input from type %d, deviceId %d, button %d, value %d, action %d",
+            type, deviceID, button, value, action);
             Controller* controller = pk->getController();
             if (controller != NULL) controller->action(action, abs(value));
         }

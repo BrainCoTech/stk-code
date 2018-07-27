@@ -100,7 +100,7 @@ public:
     /** Returns the name of the player profile. */
     core::stringw getName() const OVERRIDE;
 
-    int getFocusValue() OVERRIDE {
+    int getFocusValue() const OVERRIDE {
         /*
         if(input_manager->getDeviceContactValue() < 3){
             m_controls->setAccel(0);  

@@ -17,6 +17,7 @@ class FocusDeviceManager{
     FocusDeviceManager();
     ~FocusDeviceManager();
     bool searchFocusDevices();
+    void update();
 
     void askUserToConnectFocusDevices();
     void addFocusDevice(FusiDevice& fusiDevice);

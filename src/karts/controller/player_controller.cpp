@@ -109,7 +109,7 @@ void PlayerController::resetInputState()
  */
 bool PlayerController::action(PlayerAction action, int value, bool dry_run)
 {
-
+    Log::warn("player controller","value %d", value);
     /** If dry_run (parameter) is true, this macro tests if this action would
      *  trigger a state change in the specified variable (without actually
      *  doing it). If it will trigger a state change, the macro will
@@ -246,7 +246,7 @@ bool PlayerController::action(PlayerAction action, int value, bool dry_run)
         }
         break;
     case PA_FOCUS:
-        //Log::warn("player controller","[%s] focus accel %d",getName().c_str(), value);
+        Log::warn("player controller","[%s] focus accel %d",getName().c_str(), value);
         SET_OR_TEST(m_focus_val, value);
         // This part is copied from PA_ACCEL
         SET_OR_TEST(m_prev_accel, value);
@@ -262,6 +262,7 @@ bool PlayerController::action(PlayerAction action, int value, bool dry_run)
             SET_OR_TEST_GETTER(Brake, m_prev_brake);
             SET_OR_TEST_GETTER(Nitro, false);
         }
+        Log::warn("player controller","[%s] focus accel after %d",getName().c_str(), value);
         break;
     default:
        break;

@@ -134,3 +134,19 @@ int FocusDeviceManager::getDeviceIdFromMac(const char* device_mac){
     }
     return -1;
 }
+
+void FocusDeviceManager::update()
+{
+    if(input_manager->getDeviceManager()->m_current_focus_device == NULL)
+        return;
+    input_manager->getDeviceManager()->m_current_focus_device->m_irr_event.lock();
+    std::vector<irr::SEvent>&  events = input_manager->getDeviceManager()->m_current_focus_device->m_irr_event.getData();
+    for(unsigned int i = 0; i < events.size(); i++){
+        irr::SEvent event = events[0];
+        input_manager->input(event);
+    }
+    //Log::warn("focus device manager", "before update left event size is: %ld", input_manager->getDeviceManager()->m_current_focus_device->m_irr_event.getData().size());
+    events.clear();
+    //Log::warn("focus device manager", "after update left event size is: %ld", input_manager->getDeviceManager()->m_current_focus_device->m_irr_event.getData().size());
+    input_manager->getDeviceManager()->m_current_focus_device->m_irr_event.unlock();
+}

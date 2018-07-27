@@ -1,6 +1,8 @@
 #include "input/focus_device.hpp"
 #include "input/focus_device_manager.hpp"
 #include "input/focus_config.hpp"
+#include "input/input_manager.hpp"
+#include "input/device_manager.hpp"
 #include "fusi_sdk.h"
 
 #define ATTENTION_BUFF_SIZE 10
@@ -20,6 +22,18 @@ FocusDevice::FocusDevice(const int focus_device_id, FusiDeviceInfo* focus_device
     m_player        = NULL;
 }   // FocusDevice
 
+static void input(irr::SEvent event)
+{
+    if(input_manager->getDeviceManager()->m_current_focus_device == NULL)
+        return;
+    input_manager->getDeviceManager()->m_current_focus_device->m_irr_event.lock();
+    std::vector<irr::SEvent>&  events = input_manager->getDeviceManager()->m_current_focus_device->m_irr_event.getData();
+    events.push_back(event);
+    //Log::warn("focus device", "after input left event size is:[%ld] [%ld]", events.size(), input_manager->getDeviceManager()->m_current_focus_device->m_irr_event.getData().size());
+    input_manager->getDeviceManager()->m_current_focus_device->m_irr_event.unlock();
+}
+
+
 static void on_device_connect_callback(const char* device_mac, DeviceConnectionState state)
 {
     Log::info("Focus device manager","connected %s", device_mac);
@@ -32,7 +46,7 @@ static void on_device_attention_callback(const char* device_mac, double attentio
     event.UserEvent.UserData1 = focus_device_manager->getDeviceIdFromMac(device_mac);
     event.UserEvent.UserData2 = attention;
     event.UserEvent.type = 100;
-    input_manager->input(event);
+    input(event);
 }
 
 static void on_device_connection_change_callback(const char* device_mac, DeviceConnectionState state)
@@ -48,7 +62,7 @@ static void on_device_connection_change_callback(const char* device_mac, DeviceC
         event.UserEvent.UserData2 = -1;
     
     event.UserEvent.type = Input::IT_FOCUS_CONTACT;
-    input_manager->input(event);
+    input(event);
 }
 
 static void on_device_contact_state_change_callback(const char* device_mac, DeviceContactState state)
@@ -64,12 +78,12 @@ static void on_device_contact_state_change_callback(const char* device_mac, Devi
         event.UserEvent.UserData2 = 2;
     
     event.UserEvent.type = Input::IT_FOCUS_CONTACT;
-    input_manager->input(event);
+    input(event);
 }
 
 static int calibration_begin = 0;
 static int calibration_end = 0;
-static int calibration_expected_num = 5;
+static int calibration_expected_num = 180;
 static int calibration_finished_num = 0;
 static int calibration_max = 0;
 static int calibration_min = 100;
@@ -102,7 +116,7 @@ static void on_eeg_stats_callback(const char* device_mac, EEGStats* stats){
     }
     event.UserEvent.UserData2 = (int)acc;
     event.UserEvent.type = Input::IT_FOCUS;
-    input_manager->input(event);
+    input(event);
     */
 
     double newAcc =  stats->low_beta*250/(stats->theta + stats ->alpha);
@@ -121,20 +135,20 @@ static void on_eeg_stats_callback(const char* device_mac, EEGStats* stats){
         Log::warn("focus device", "calibration_min[%d] calibration_max[%d] new[%f] standardlized[%f]", calibration_min, calibration_max, newAcc, current);
         event.UserEvent.UserData2 = (int)current;
         event.UserEvent.type = Input::IT_FOCUS;
-        input_manager->input(event);
+        input(event);
     }
     else if(calibration_begin > 0){
         if(calibration_finished_num >= calibration_expected_num){
             calibration_end = 1;
             event.UserEvent.UserData2 = 5;
             event.UserEvent.type = Input::IT_FOCUS_CONTACT;
-            input_manager->input(event);
+            input(event);
         }
         else{
             calibration_add(newAcc);
             event.UserEvent.UserData2 = 4;
             event.UserEvent.type = Input::IT_FOCUS_CONTACT;
-            input_manager->input(event);
+            input(event);
         }
     }
     else if(calibration_begin == 0){
@@ -142,7 +156,7 @@ static void on_eeg_stats_callback(const char* device_mac, EEGStats* stats){
         calibration_add(newAcc);
         event.UserEvent.UserData2 = 4;
         event.UserEvent.type = Input::IT_FOCUS_CONTACT;
-        input_manager->input(event);
+        input(event);
     }
 
 }

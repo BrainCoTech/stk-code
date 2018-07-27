@@ -4,6 +4,8 @@
 #include "input/input_device.hpp"
 #include "fusi_sdk.h"
 #include "utils/cpp2011.hpp"
+#include "utils/synchronised.hpp"
+#include <vector>
 
 class FocusConfig;
 
@@ -32,6 +34,7 @@ public:
     
     int getFocusDeviceId() { return m_focus_device_id; }
     const char* getFocusDeviceMac() { return m_focus_device_info->mac; }
+    Synchronised<std::vector<irr::SEvent> > m_irr_event;
 };   // FocusDevice
 
 #endif

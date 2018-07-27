@@ -1088,8 +1088,8 @@ void RaceGUI::drawFocusMeter(const AbstractKart* kart,
     int gauge_width        = (int)(GAUGEWIDTH*min_ratio);
     int gauge_height       = (int)(GAUGEWIDTH*min_ratio);
 
-    AbstractKart* nkart = const_cast<AbstractKart*>(kart);
-    float focusValue = (nkart->getController())->getFocusValue();
+    //AbstractKart* nkart = const_cast<AbstractKart*>(kart);
+    float focusValue = (kart->getController())->getFocusValue();
     float focusRatio = focusValue/(float)(Input::MAX_VALUE);
     int focusScore = (int)(focusRatio * 100);
     Log::info("Race gui","%f", focusRatio);
