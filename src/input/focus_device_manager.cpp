@@ -4,22 +4,55 @@
 #include "input/device_manager.hpp"
 #include "input/focus_device.hpp"
 #include "utils/log.hpp"
+#include "io/file_manager.hpp"
 #include "states_screens/dialogs/message_dialog.hpp"
 #include <vector>
 #include "fusi_sdk.h"
-
+#include <chrono>
+using namespace std;
 FocusDeviceManager* focus_device_manager;
 std::vector<FusiDeviceInfo>         m_fusi_device_info_list;
+static const char DEVICE_FILE_NAME[] = "focus.xml";
 
 MessageDialog* focus_device_search_dialog;
 
 FocusDeviceManager::FocusDeviceManager()
 {
+    m_deviceLog = new std::ofstream();
+    std::string filepath = file_manager->getUserConfigFile(DEVICE_FILE_NAME);
+    m_deviceLog -> open(filepath.c_str(), std::ofstream::out | std::ofstream::app);
 }
+
+static string current_timelabel = "";
+static string getTimeLabel(){
+        chrono::time_point<chrono::system_clock> sys_clock = chrono::system_clock::now();
+        time_t now = chrono::system_clock::to_time_t(sys_clock);
+        tm* localTime = localtime(&now);
+
+        ostringstream timeLabelStream;
+        timeLabelStream << localTime->tm_year + 1900;
+
+        if(localTime->tm_mon < 9) timeLabelStream << '0';
+        timeLabelStream << localTime->tm_mon + 1;
+        if(localTime->tm_mday < 10) timeLabelStream << '0';
+        timeLabelStream << localTime->tm_mday << '-';
+        if(localTime -> tm_hour < 10) timeLabelStream << '0';
+        timeLabelStream << localTime->tm_hour << '-';
+        if(localTime -> tm_min < 10) timeLabelStream << '0';
+        timeLabelStream<< localTime->tm_min << '-';
+        if(localTime -> tm_sec < 10) timeLabelStream << '0';
+        timeLabelStream << localTime -> tm_sec;
+        return timeLabelStream.str();
+    }
 
 // -----------------------------------------------------------------------------
 FocusDeviceManager::~FocusDeviceManager()
 {
+    if(m_deviceLog->is_open()){
+        m_deviceLog->close();
+    }
+
+    delete m_deviceLog;
 }
 
 static int str_deep_copy(const char** dst, const char* src){
@@ -142,11 +175,35 @@ void FocusDeviceManager::update()
     input_manager->getDeviceManager()->m_current_focus_device->m_irr_event.lock();
     std::vector<irr::SEvent>&  events = input_manager->getDeviceManager()->m_current_focus_device->m_irr_event.getData();
     for(unsigned int i = 0; i < events.size(); i++){
-        irr::SEvent event = events[0];
-        input_manager->input(event);
+        irr::SEvent event = events[i];
+        if(Input::IT_NONE != event.UserEvent.type)
+            input_manager->input(event);
+
+        logEvent(event);        
     }
     //Log::warn("focus device manager", "before update left event size is: %ld", input_manager->getDeviceManager()->m_current_focus_device->m_irr_event.getData().size());
     events.clear();
     //Log::warn("focus device manager", "after update left event size is: %ld", input_manager->getDeviceManager()->m_current_focus_device->m_irr_event.getData().size());
     input_manager->getDeviceManager()->m_current_focus_device->m_irr_event.unlock();
+}
+
+void FocusDeviceManager::logEvent(irr::SEvent event)
+{
+    current_timelabel = getTimeLabel();
+    if(Input::IT_NONE == event.UserEvent.type){
+        EEGData* dataForLog = (EEGData*)event.UserEvent.data;
+        *m_deviceLog << current_timelabel << " " << input_manager->getDeviceManager()->getFocusDevice(event.UserEvent.UserData1)->getFocusDeviceMac() << " " << event.UserEvent.type << " ";
+        *m_deviceLog << dataForLog->size << " " << dataForLog->sample_rate << " " << dataForLog->pga << " ";
+        *m_deviceLog << "[" << dataForLog->data[0];
+        for(int i = 1; i < dataForLog->size; i++){
+            *m_deviceLog << " " << dataForLog->data[i] ;
+        }
+        *m_deviceLog << "]" << endl;
+
+        delete [] dataForLog->data;
+        delete dataForLog;
+    }
+    else{
+        *m_deviceLog << current_timelabel << " " << input_manager->getDeviceManager()->getFocusDevice(event.UserEvent.UserData1)->getFocusDeviceMac() << " " << event.UserEvent.type << " " << event.UserEvent.UserData2 << std::endl;
+    }
 }

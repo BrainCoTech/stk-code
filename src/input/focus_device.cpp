@@ -94,6 +94,22 @@ static void calibration_add(double value){
     calibration_finished_num++;
 }
 
+static void on_eeg_data_callback(const char* device_mac, EEGData* data){
+    EEGData* dataForLog = new EEGData;
+    dataForLog->size = data->size;
+    dataForLog->sample_rate = data->sample_rate;
+    dataForLog->pga = data->pga;
+    dataForLog->data = new double[data->size];
+    memcpy(dataForLog->data, data->data, data->size * sizeof(double));
+
+    irr::SEvent event;
+    event.EventType = irr::EET_USER_EVENT;
+    event.UserEvent.UserData1 = focus_device_manager->getDeviceIdFromMac(device_mac);
+    event.UserEvent.data = (void*)dataForLog;
+    event.UserEvent.type = Input::IT_NONE;
+    input(event);
+}
+
 static void on_eeg_stats_callback(const char* device_mac, EEGStats* stats){
     irr::SEvent event;
     event.EventType = irr::EET_USER_EVENT;
@@ -168,6 +184,7 @@ void FocusDevice::connectDevice(){
     set_eeg_stats_callback(m_focus_device, on_eeg_stats_callback);
     set_device_connection_callback(m_focus_device, on_device_connection_change_callback);
     set_device_contact_state_callback(m_focus_device, on_device_contact_state_change_callback);
+    set_eeg_data_callback(m_focus_device, on_eeg_data_callback);
     fusi_connect(m_focus_device, on_device_connection_change_callback, 1);
 }
 

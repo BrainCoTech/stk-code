@@ -566,6 +566,7 @@ struct SEvent
 
 		//
 		int type;
+		void* data;
 	};
 	
 	// Raw events from the OS
