@@ -635,7 +635,11 @@ void InputManager::dispatchInput(Input::InputType type, int deviceID,
                                  Input::AxisDirection axisDirection, int value,
                                  bool shift_mask)
 {
-    if (type == Input::IT_FOCUS_CONTACT)
+    if (type == Input::IT_FOCUS){
+        if(m_device_contact_val < 3)
+            m_device_contact_val = 3;
+    }
+    else if (type == Input::IT_FOCUS_CONTACT)
     {
         Log::warn("input manager","contact state change to [%d]", value);
         m_device_contact_val = value;

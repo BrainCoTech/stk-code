@@ -241,6 +241,10 @@ void RaceResultGUI::enableAllButtons()
 void RaceResultGUI::eventCallback(GUIEngine::Widget* widget,
     const std::string& name, const int playerID)
 {
+    if(name == "contact_state"){
+        Log::warn("race result gui", "receive contact state value[%d]", playerID);
+        return;
+    }
     int n_tracks = race_manager->getGrandPrix().getNumberOfTracks();
     if (name == "up_button" && n_tracks > m_max_tracks && m_start_track > 0)
     {
