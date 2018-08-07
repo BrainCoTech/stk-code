@@ -27,14 +27,12 @@ src/html
 
 *.o
 *.d
-*.a
 *.patch
 *.diff
 *.obj
 *.orig
 *.rej
 *.log
-*.lib
 *.tlog
 *.pdb
 *.dll
