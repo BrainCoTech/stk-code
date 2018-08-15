@@ -9,6 +9,7 @@
 #include <vector>
 #include "fusi_sdk.h"
 #include <chrono>
+#include "guiengine/screen_keyboard.hpp"
 using namespace std;
 FocusDeviceManager* focus_device_manager;
 std::vector<FusiDeviceInfo>         m_fusi_device_info_list;
@@ -204,6 +205,24 @@ void FocusDeviceManager::logEvent(irr::SEvent event)
         delete dataForLog;
     }
     else{
-        *m_deviceLog << current_timelabel << " " << input_manager->getDeviceManager()->getFocusDevice(event.UserEvent.UserData1)->getFocusDeviceMac() << " " << event.UserEvent.type << " " << event.UserEvent.UserData2 << std::endl;
+        bool isInGame = (StateManager::get()->getGameState() == GUIEngine::GAME &&
+             !GUIEngine::ModalDialog::isADialogActive()            &&
+             !GUIEngine::ScreenKeyboard::isActive()                &&
+             !race_manager->isWatchingReplay() );
+
+        bool isInGameMode = (StateManager::get()->getGameState() == GUIEngine::GAME);
+        if(isInGame)
+            *m_deviceLog << current_timelabel << " " << input_manager->getDeviceManager()->getFocusDevice(event.UserEvent.UserData1)->getFocusDeviceMac() << " " << event.UserEvent.type << " " << event.UserEvent.UserData2 << " 0 INGAME" <<  std::endl;
+        else if(isInGameMode)
+            *m_deviceLog << current_timelabel << " " << input_manager->getDeviceManager()->getFocusDevice(event.UserEvent.UserData1)->getFocusDeviceMac() << " " << event.UserEvent.type << " " << event.UserEvent.UserData2 << " 1 INPAUSE" <<  std::endl;
+        else
+            *m_deviceLog << current_timelabel << " " << input_manager->getDeviceManager()->getFocusDevice(event.UserEvent.UserData1)->getFocusDeviceMac() << " " << event.UserEvent.type << " " << event.UserEvent.UserData2 << " 2 OTHERS" << std::endl;
     }
+}
+
+void FocusDeviceManager::logTagEvent(string tag)
+{
+    current_timelabel = getTimeLabel();
+    *m_deviceLog << current_timelabel << " " << input_manager->getDeviceManager()->m_current_focus_device->getFocusDeviceMac() << " " << tag << std::endl;
+
 }

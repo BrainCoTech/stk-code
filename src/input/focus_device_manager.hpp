@@ -27,6 +27,8 @@ class FocusDeviceManager{
     int getDeviceIdFromMac(const char* device_mac);
 
     void logEvent(irr::SEvent event);
+    void logTagEvent(std::string tag);
+
 };
 
 #endif
