@@ -21,6 +21,7 @@
 
 #include "config/user_config.hpp"
 #include "input/input_manager.hpp"
+#include "input/focus_device.hpp"
 #include "items/attachment.hpp"
 #include "items/item.hpp"
 #include "items/powerup.hpp"
@@ -83,6 +84,17 @@ void PlayerController::resetInputState()
     m_prev_nitro            = false;
     m_controls->reset();
 }   // resetInputState
+
+static float thresholding_strategy(float value){
+    if(value < 0.3)
+        return 0;
+    else if(value < 0.5)
+        return 0.5;
+    else if(value < 0.7)
+        return 0.7;
+    else
+        return 1.0;
+}
 
 // ----------------------------------------------------------------------------
 /** This function interprets a kart action and value, and set the corresponding
@@ -252,7 +264,10 @@ bool PlayerController::action(PlayerAction action, int value, bool dry_run)
         SET_OR_TEST(m_prev_accel, value);
         if (value && !(m_penalty_ticks > 0))
         {
-            SET_OR_TEST_GETTER(Accel, value/32768.0f);
+            //float adjusted_accel_value = thresholding_strategy(value/32768.0f);
+            float adjusted_accel_value = FocusDevice::thresholding_strategy_3(value*100/32768.0f)/100.0;
+            SET_OR_TEST_GETTER(Accel, adjusted_accel_value);
+            Log::warn("player controller","[%s] focus adjusted accel %f",getName().c_str(), adjusted_accel_value);
             SET_OR_TEST_GETTER(Brake, false);
             SET_OR_TEST_GETTER(Nitro, m_prev_nitro);
         }

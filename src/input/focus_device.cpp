@@ -110,11 +110,50 @@ static void on_eeg_data_callback(const char* device_mac, EEGData* data){
     input(event);
 }
 
+int FocusDevice::thresholding_strategy_1(int value, int min, int max){
+    if(min + (max-min)*0.7 <= value)
+        return 100;
+    else if(value <= min)
+        return 0;
+    else{
+        return 100*(value - min)/((max-min)*0.7);
+    }
+}
+
+int FocusDevice::thresholding_strategy_2(int value){
+    int min = calibration_min;
+    int max = calibration_max;
+    if(value <= min)
+        return 0;
+    else if(value <= (min + (max-min)*0.3))
+        return 0;
+    else if(value <= (min + (max-min)*0.5))
+        return 40;
+    else if(value <= (min + (max-min)*0.7))
+        return 60;
+    else 
+        return 100;
+
+}
+
+int FocusDevice::thresholding_strategy_3(int value){
+    int min = calibration_min;
+    int max = calibration_max;
+    if(value <= min)
+        return 0;
+    else if(value <= (min + (max-min)*0.15))
+        return 10;
+    else if(value <= (min + (max-min)*0.8))
+        return value;
+    else 
+        return 100;
+
+}
+
 static void on_eeg_stats_callback(const char* device_mac, EEGStats* stats){
     irr::SEvent event;
     event.EventType = irr::EET_USER_EVENT;
     event.UserEvent.UserData1 = focus_device_manager->getDeviceIdFromMac(device_mac);
-    Log::warn("Focus device manager","lowbeta[%f] theta[%f] result[%f]", stats->low_beta, stats->theta, stats->low_beta*200/stats->theta);
     
     /*
     double newAcc =  stats->low_beta*250/(stats->theta + stats ->alpha);
@@ -138,18 +177,12 @@ static void on_eeg_stats_callback(const char* device_mac, EEGStats* stats){
     double newAcc =  stats->low_beta*250/(stats->theta + stats ->alpha);
     if(newAcc > 100.0) newAcc = 100.0;
     if(newAcc <= 1) newAcc = 1;
-    if(calibration_end > 0){
-        double current;
-        if(calibration_min + (calibration_max-calibration_min)*0.7 <= newAcc)
-            current = 100;
-        else if(newAcc <= calibration_min)
-            current = 0;
-        else{
-            current = 100*(newAcc - calibration_min)/((calibration_max-calibration_min)*0.7);
-        }
+    Log::warn("Focus device","lowbeta[%f] theta[%f] result[%f]", stats->low_beta, stats->theta, newAcc);
 
-        Log::warn("focus device", "calibration_min[%d] calibration_max[%d] new[%f] standardlized[%f]", calibration_min, calibration_max, newAcc, current);
-        event.UserEvent.UserData2 = (int)current;
+    if(calibration_end > 0){
+        //int current = thresholding_strategy_2((int)newAcc, calibration_min, calibration_max);
+        Log::warn("focus device", "calibration_min[%d] calibration_max[%d] new[%f]", calibration_min, calibration_max, newAcc);
+        event.UserEvent.UserData2 = newAcc;
         event.UserEvent.type = Input::IT_FOCUS;
         input(event);
     }

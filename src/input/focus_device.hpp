@@ -35,6 +35,9 @@ public:
     int getFocusDeviceId() { return m_focus_device_id; }
     const char* getFocusDeviceMac() { return m_focus_device_info->mac; }
     Synchronised<std::vector<irr::SEvent> > m_irr_event;
+    static int thresholding_strategy_1(int value, int min, int max);
+    static int thresholding_strategy_2(int value);
+    static int thresholding_strategy_3(int value);
 };   // FocusDevice
 
 #endif
