@@ -54,11 +54,11 @@ void ListWidget::setIcons(STKModifiedSpriteBank* icons, int size)
     m_use_icons = (icons != NULL);
     m_icons = icons;
 
+    CGUISTKListBox* list = getIrrlichtElement<CGUISTKListBox>();
+    assert(list != NULL);
+
     if (m_use_icons)
     {
-        CGUISTKListBox* list = getIrrlichtElement<CGUISTKListBox>();
-        assert(list != NULL);
-
         list->setSpriteBank(m_icons);
 
         // determine needed height
@@ -82,6 +82,10 @@ void ListWidget::setIcons(STKModifiedSpriteBank* icons, int size)
         {
             list->setItemHeight( item_height );
         }
+    }
+    else
+    {
+        list->setSpriteBank(NULL);
     }
 
 }
@@ -145,7 +149,8 @@ void ListWidget::createHeader()
         }
 
         int x = m_x;
-        for (unsigned int n=0; n<m_header.size(); n++)
+        int scrollbar_width = GUIEngine::getSkin()->getSize(EGDS_SCROLLBAR_SIZE);
+        for (unsigned int n=0; n<m_header.size()+1; n++)
         {
             std::ostringstream name;
             name << m_properties[PROP_ID];
@@ -160,12 +165,22 @@ void ListWidget::createHeader()
             header->m_h = header_height;
 
             header->m_x = x;
-            header->m_w = (int)(m_w * float(m_header[n].m_proportion)
-                                /float(proportion_total));
+            if (n == m_header.size())
+            {
+                header->m_w = scrollbar_width;
+                header->setActive(false);
+            }
+            else
+            {
+                int header_width = m_w - scrollbar_width;
+                header->m_w = (int)(header_width * float(m_header[n].m_proportion)
+                                    /float(proportion_total));
+            }
 
             x += header->m_w;
 
-            header->setText( m_header[n].m_text );
+            if (n < m_header.size())
+                header->setText( m_header[n].m_text );
             header->m_properties[PROP_ID] = name.str();
 
             header->add();
@@ -224,6 +239,7 @@ void ListWidget::addItem(   const std::string& internal_name,
     ListItem newItem;
     newItem.m_internal_name = internal_name;
     newItem.m_contents.push_back(cell);
+    newItem.m_word_wrap = (m_properties[PROP_WORD_WRAP] == "true");
 
     CGUISTKListBox* list = getIrrlichtElement<CGUISTKListBox>();
     assert(list != NULL);
@@ -251,6 +267,7 @@ void ListWidget::addItem(const std::string& internal_name,
     {
         newItem.m_contents.push_back(contents[i]);
     }
+    newItem.m_word_wrap = (m_properties[PROP_WORD_WRAP] == "true");
 
     CGUISTKListBox* list = getIrrlichtElement<CGUISTKListBox>();
     assert(list != NULL);
@@ -416,8 +433,8 @@ void ListWidget::markItemRed(const int id, bool red)
     }
     else
     {
-        irritem->setItemOverrideColor( id, EGUI_LBC_TEXT,           video::SColor(255,0,0,0) );
-        irritem->setItemOverrideColor( id, EGUI_LBC_TEXT_HIGHLIGHT, video::SColor(255,255,255,255) );
+        irritem->setItemOverrideColor( id, EGUI_LBC_TEXT,           GUIEngine::getSkin()->getColor("text::neutral"));
+        irritem->setItemOverrideColor( id, EGUI_LBC_TEXT_HIGHLIGHT, GUIEngine::getSkin()->getColor("text::focused"));
     }
 }
 
@@ -432,15 +449,36 @@ void ListWidget::markItemBlue(const int id, bool blue)
 
     if (blue)
     {
-        irritem->setItemOverrideColor( id, EGUI_LBC_TEXT,           video::SColor(255,0,0,255) );
-        irritem->setItemOverrideColor( id, EGUI_LBC_TEXT_HIGHLIGHT, video::SColor(255,0,0,255) );
+        irritem->setItemOverrideColor( id, EGUI_LBC_TEXT,           GUIEngine::getSkin()->getColor("list_blue::neutral"));
+        irritem->setItemOverrideColor( id, EGUI_LBC_TEXT_HIGHLIGHT, GUIEngine::getSkin()->getColor("list_blue::focused"));
     }
     else
     {
-        irritem->setItemOverrideColor( id, EGUI_LBC_TEXT,           video::SColor(255,0,0,0) );
-        irritem->setItemOverrideColor( id, EGUI_LBC_TEXT_HIGHLIGHT, video::SColor(255,255,255,255) );
+        irritem->setItemOverrideColor( id, EGUI_LBC_TEXT,           GUIEngine::getSkin()->getColor("text::neutral"));
+        irritem->setItemOverrideColor( id, EGUI_LBC_TEXT_HIGHLIGHT, GUIEngine::getSkin()->getColor("text::focused"));
     }
 }
+
+// -----------------------------------------------------------------------------
+
+void ListWidget::emphasisItem(const int id, bool enable)
+{
+    // May only be called AFTER this widget has been add()ed
+    assert(m_element != NULL);
+
+    CGUISTKListBox* irritem = getIrrlichtElement<CGUISTKListBox>();
+
+    if (enable)
+    {
+        irritem->setItemOverrideColor( id, EGUI_LBC_TEXT,           GUIEngine::getSkin()->getColor("emphasis_text::neutral"));
+        irritem->setItemOverrideColor( id, EGUI_LBC_TEXT_HIGHLIGHT, GUIEngine::getSkin()->getColor("emphasis_text::focused"));
+    }
+    else
+    {
+        irritem->setItemOverrideColor( id, EGUI_LBC_TEXT,           GUIEngine::getSkin()->getColor("text::neutral"));
+        irritem->setItemOverrideColor( id, EGUI_LBC_TEXT_HIGHLIGHT, GUIEngine::getSkin()->getColor("text::focused"));
+    }
+} // emphasisItem
 
 // -----------------------------------------------------------------------------
 
@@ -479,13 +517,50 @@ EventPropagation ListWidget::transmitEvent(Widget* w,
         m_header_elements[col].getIrrlichtElement<IGUIButton>()->setPressed(true);
         */
 
-        if (m_listener) m_listener->onColumnClicked(m_sort_col);
+        if (m_listener) m_listener->onColumnClicked(m_sort_col, m_sort_desc, m_sort_default);
 
         return EVENT_BLOCK;
     }
 
     return EVENT_LET;
 }
+
+// -----------------------------------------------------------------------------
+
+EventPropagation ListWidget::upPressed(const int playerID)
+{
+    return moveToNextItem(/*reverse*/ true);
+} // upPressed
+
+// -----------------------------------------------------------------------------
+
+EventPropagation ListWidget::downPressed(const int playerID)
+{
+    return moveToNextItem(/*reverse*/ false);
+} // downPressed
+
+EventPropagation ListWidget::moveToNextItem(const bool reverse)
+{
+    // if widget is deactivated, do nothing
+    if (m_deactivated) return EVENT_BLOCK;
+
+    const bool stay_within_list = reverse ? getSelectionID() > 0 :
+                                            getSelectionID() < getItemCount() - 1;
+
+    if (stay_within_list)
+    {
+        if (reverse)
+            setSelectionID(getSelectionID() - 1);
+        else
+            setSelectionID(getSelectionID() + 1);
+        return EVENT_BLOCK_BUT_HANDLED;
+    }
+    else
+    {
+        setSelectionID(-1); // select nothing
+    }
+    return EVENT_BLOCK;
+} // moveToNextItem
 
 // -----------------------------------------------------------------------------
 int ListWidget::getItemID(const std::string &internalName) const

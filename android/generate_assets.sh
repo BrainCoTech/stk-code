@@ -14,17 +14,18 @@
 # value greater than 0.
 # The CONVERT_TO_JPG variable enables converting all images that are safe to 
 # convert and keeps other images untouched.
-# The script needs imagemagick and ogg utils installed to use DECREASE_QUALITY
-# feature
+# The script needs imagemagick, pngquant and ogg utils installed in order to 
+# use DECREASE_QUALITY feature
 
 ################################################################################
 
 export KARTS="all"
-export TRACKS="abyss battleisland cave cornfield_crossing endcutscene        \
-               featunlocked fortmagma gplose gpwin hacienda icy_soccer_field \
-               introcutscene introcutscene2 lighthouse mines olivermath      \
-               overworld sandtrack scotland snowmountain snowtuxpeak         \
-               soccer_field stadium tutorial zengarden"
+export TRACKS="abyss arena_candela_city battleisland cave cornfield_crossing   \
+               endcutscene featunlocked fortmagma gplose gpwin hacienda        \
+               icy_soccer_field introcutscene introcutscene2 lasdunasarena     \
+               lasdunassoccer lighthouse mines olivermath overworld sandtrack  \
+               scotland snowmountain snowtuxpeak soccer_field stadium temple   \
+               tutorial zengarden"
 
 export ASSETS_PATHS="../data                    \
                      ../../stk-assets           \
@@ -203,7 +204,7 @@ convert_image()
     fi
 
     convert $SCALE_CMD $QUALITY_CMD "$FILE" "tmp.$FILE_TYPE"
-
+    
     if [ -s "tmp.$FILE_TYPE" ]; then
         SIZE_OLD=`du -k "$FILE" | cut -f1`
         SIZE_NEW=`du -k "tmp.$FILE_TYPE" | cut -f1`
@@ -259,10 +260,23 @@ convert_sound()
     rm -f tmp.wav tmp.ogg
 }
 
+optimize_png()
+{
+    FILE="$1"
+    echo "Optimize file: $FILE"
+
+    if [ ! -f "$FILE" ]; then
+        echo "  File doesn't exist."
+        return
+    fi
+    
+    pngquant --force --skip-if-larger --output "$FILE" -- "$FILE"
+}
+
 convert_to_jpg()
 {
     FILE="$1"
-    echo "Convert file: $FILE"
+    echo "Convert file to jpg: $FILE"
 
     if [ ! -f "$FILE" ]; then
         echo "  File doesn't exist."
@@ -347,7 +361,7 @@ convert_to_jpg()
 convert_to_jpg_extract_b3dz()
 {
     FILE="$1"
-    echo "Convert file: $FILE"
+    echo "Extract b3dz file: $FILE"
 
     if [ ! -f "$FILE" ]; then
         echo "  File doesn't exist."
@@ -368,7 +382,7 @@ convert_to_jpg_extract_b3dz()
 convert_to_jpg_update_b3d()
 {
     FILE="$1"
-    echo "Convert file: $FILE"
+    echo "Update b3d file: $FILE"
 
     if [ ! -f "$1" ]; then
         echo "  File doesn't exist."
@@ -448,7 +462,7 @@ convert_to_jpg_update_b3d()
 convert_to_jpg_update_spm()
 {
     FILE="$1"
-    echo "Convert file: $FILE"
+    echo "Update spm file: $FILE"
 
     if [ ! -f "$1" ]; then
         echo "  File doesn't exist."
@@ -520,7 +534,7 @@ convert_to_jpg_update_spm()
 convert_to_jpg_update_xml()
 {
     FILE="$1"
-    echo "Convert file: $FILE"
+    echo "Update xml file: $FILE"
 
     if [ ! -f "$FILE" ]; then
         echo "  File doesn't exist."
@@ -568,6 +582,10 @@ if [ $CONVERT_TO_JPG -gt 0 ]; then
     fi
 fi
 
+if [ $DECREASE_QUALITY -gt 0 ]; then
+    find assets/data -iname "*.png" | while read f; do optimize_png "$f" "png"; done
+fi
+
 
 # Copy data directory
 echo "Copy data directory"
@@ -589,7 +607,7 @@ fi
 
 # Generate directories list
 echo "Generate directories list"
-find assets/* -type d > assets/directories.txt
+find assets/* -type d | sort > assets/directories.txt
 sed -i s/'.\/assets\/'// assets/directories.txt
 sed -i s/'assets\/'// assets/directories.txt
 

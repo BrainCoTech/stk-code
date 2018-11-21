@@ -117,15 +117,6 @@ void STKConfig::load(const std::string &filename)
         Log::fatal("StkConfig", "Wrong number of item switches defined in stk_config");
     }
 
-    if (m_positional_smoothing.size() == 0)
-    {
-        Log::fatal("StkConfig", "No positional smoothing defined in stk_config.");
-    }
-    if (m_rotational_smoothing.size() == 0)
-    {
-        Log::fatal("StkConfig", "No rotationalsmoothing defined in stk_config.");
-    }
-
     if (m_client_port == 0 || m_server_port == 0 || m_server_discovery_port == 0 ||
         m_client_port == m_server_port || m_client_port == m_server_discovery_port ||
         m_server_port == m_server_discovery_port)
@@ -161,7 +152,16 @@ void STKConfig::load(const std::string &filename)
     CHECK_NEG(m_default_track_friction,    "physics default-track-friction");
     CHECK_NEG(m_physics_fps,               "physics fps"                );
     CHECK_NEG(m_network_state_frequeny,    "network state-frequency"    );
+    CHECK_NEG(m_max_moveable_objects,      "network max-moveable-objects");
+    CHECK_NEG(m_network_steering_reduction,"network steering-reduction" );
     CHECK_NEG(m_default_moveable_friction, "physics default-moveable-friction");
+    CHECK_NEG(m_solver_iterations,         "physics: solver-iterations"       );
+    CHECK_NEG(m_solver_split_impulse_thresh,"physics: solver-split-impulse-threshold");
+    CHECK_NEG(m_snb_min_adjust_length, "network smoothing: min-adjust-length");
+    CHECK_NEG(m_snb_max_adjust_length, "network smoothing: max-adjust-length");
+    CHECK_NEG(m_snb_min_adjust_speed, "network smoothing: min-adjust-speed");
+    CHECK_NEG(m_snb_max_adjust_time, "network smoothing: max-adjust-time");
+    CHECK_NEG(m_snb_adjust_length_threshold, "network smoothing: adjust-length-threshold");
 
     // Square distance to make distance checks cheaper (no sqrt)
     m_default_kart_properties->checkAllSet(filename);
@@ -174,11 +174,11 @@ void STKConfig::load(const std::string &filename)
  */
 void STKConfig::init_defaults()
 {
-    m_bomb_time                  = m_bomb_time_increase        =
-        m_explosion_impulse_objects = m_music_credit_time      =
-        m_delay_finish_time      = m_skid_fadeout_time         =
-        m_near_ground            = 
-        m_smooth_angle_limit     = m_default_track_friction    =
+    m_bomb_time                  = m_bomb_time_increase          =
+        m_explosion_impulse_objects = m_music_credit_time        =
+        m_delay_finish_time      = m_skid_fadeout_time           =
+        m_near_ground            = m_solver_split_impulse_thresh =
+        m_smooth_angle_limit     = m_default_track_friction      =
         m_default_moveable_friction =    UNDEFINED;
     m_item_switch_ticks          = -100;
     m_penalty_ticks              = -100;
@@ -201,8 +201,16 @@ void STKConfig::init_defaults()
     m_minimap_size               = -100;
     m_minimap_ai_icon            = -100;
     m_minimap_player_icon        = -100;
+    m_donate_url                 = "";
+    m_password_reset_url         = "";
     m_network_state_frequeny     = -100;
+    m_max_moveable_objects       = -100;
+    m_solver_iterations          = -100;
+    m_solver_set_flags           = 0;
+    m_solver_reset_flags         = 0;
+    m_network_steering_reduction = -100;
     m_title_music                = NULL;
+    m_solver_split_impulse       = false;
     m_smooth_normals             = false;
     m_same_powerup_mode          = POWERUP_MODE_ONLY_IF_SAME;
     m_ai_acceleration            = 1.0f;
@@ -214,6 +222,9 @@ void STKConfig::init_defaults()
     m_server_discovery_port      = 2757;
     m_client_port                = 2758;
     m_server_port                = 2759;
+    m_snb_min_adjust_length = m_snb_max_adjust_length =
+        m_snb_min_adjust_speed = m_snb_max_adjust_time =
+        m_snb_adjust_length_threshold = UNDEFINED;
 
     m_score_increase.clear();
     m_leader_intervals.clear();
@@ -287,6 +298,42 @@ void STKConfig::getAllData(const XMLNode * root)
         physics_node->get("default-moveable-friction",
                                                  &m_default_moveable_friction);
         physics_node->get("fps",                    &m_physics_fps           );
+        physics_node->get("solver-iterations",      &m_solver_iterations     );
+        physics_node->get("solver-split-impulse",   &m_solver_split_impulse  );
+        physics_node->get("solver-split-impulse-threshold",
+                                               &m_solver_split_impulse_thresh);
+        std::vector<std::string> solver_modes;
+        physics_node->get("solver-mode",            &solver_modes            );
+        m_solver_set_flags=0, m_solver_reset_flags = 0;
+        int *p;
+        for (auto mode : solver_modes)
+        {
+            std::string s = mode;
+            p = &m_solver_set_flags;
+            if (s[0] == '-')
+            {
+                s.erase(s.begin());
+                p = &m_solver_reset_flags;
+            }
+            s = StringUtils::toLowerCase(s);
+            if      (s == "randmize_order"                         ) *p |=   1;
+            else if (s == "friction_separate"                      ) *p |=   2;
+            else if (s == "use_warmstarting"                       ) *p |=   4;
+            else if (s == "use_friction_warmstarting"              ) *p |=   8;
+            else if (s == "use_2_friction_directions"              ) *p |=  16;
+            else if (s == "enable_friction_direction_caching"      ) *p |=  32;
+            else if (s == "disable_velocity_dependent_friction_direction") *p |= 64;
+            else if (s == "cache_friendly"                         ) *p |= 128;
+            else if (s == "simd"                                   ) *p |= 256;
+            else if (s == "cuda"                                   ) *p |= 512;
+            else
+            {
+                Log::fatal("STK-Config",
+                           "Unknown option '%s' for solver-mode - ignored.",
+                           s.c_str());
+            }
+        }   // for mode in solver_modes
+
     }
 
     if (const XMLNode *startup_node= root->getNode("startup"))
@@ -397,9 +444,9 @@ void STKConfig::getAllData(const XMLNode * root)
 
     if (const XMLNode *networking_node = root->getNode("networking"))
     {
-        networking_node->get("state-frequency",      &m_network_state_frequeny);
-        networking_node->get("positional-smoothing", &m_positional_smoothing  );
-        networking_node->get("rotational-smoothing", &m_rotational_smoothing  );
+        networking_node->get("state-frequency", &m_network_state_frequeny);
+        networking_node->get("max-moveable-objects", &m_max_moveable_objects);
+        networking_node->get("steering-reduction", &m_network_steering_reduction);
     }
 
     if(const XMLNode *replay_node = root->getNode("replay"))
@@ -418,6 +465,12 @@ void STKConfig::getAllData(const XMLNode * root)
         replay_node->get("player-icon", &m_minimap_player_icon  );
     }
 
+    if(const XMLNode *replay_node = root->getNode("urls"))
+    {
+        replay_node->get("donate",         &m_donate_url         );
+        replay_node->get("password-reset", &m_password_reset_url );
+    }
+
     if (const XMLNode *fonts_list = root->getNode("fonts-list"))
     {
         fonts_list->get("normal-ttf", &m_normal_ttf);
@@ -434,17 +487,26 @@ void STKConfig::getAllData(const XMLNode * root)
         tc->get("quality", &m_tc_quality);
     }
 
-    if (const XMLNode *tc = root->getNode("network"))
+    if (const XMLNode *np = root->getNode("network-ports"))
     {
         unsigned server_discovery_port = 0;
         unsigned client_port = 0;
         unsigned server_port = 0;
-        tc->get("server-discovery-port", &server_discovery_port);
-        tc->get("client-port", &client_port);
-        tc->get("server-port", &server_port);
+        np->get("server-discovery-port", &server_discovery_port);
+        np->get("client-port", &client_port);
+        np->get("server-port", &server_port);
         m_server_discovery_port = (uint16_t)server_discovery_port;
         m_client_port = (uint16_t)client_port;
         m_server_port = (uint16_t)server_port;
+    }
+
+    if (const XMLNode *ns = root->getNode("network-smoothing"))
+    {
+        ns->get("min-adjust-length", &m_snb_min_adjust_length);
+        ns->get("max-adjust-length", &m_snb_max_adjust_length);
+        ns->get("min-adjust-speed", &m_snb_min_adjust_speed);
+        ns->get("max-adjust-time", &m_snb_max_adjust_time);
+        ns->get("adjust-length-threshold", &m_snb_adjust_length_threshold);
     }
 
     // Get the default KartProperties

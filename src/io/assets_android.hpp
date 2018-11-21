@@ -42,6 +42,8 @@ public:
     ~AssetsAndroid() {};
 
     void init();
+    static std::string getDataPath();
+    static std::string getLibPath();
 };
 
 

@@ -19,7 +19,10 @@
 #include "states_screens/dialogs/ghost_replay_info_dialog.hpp"
 
 #include "config/player_manager.hpp"
+#include "guiengine/CGUISpriteBank.hpp"
 #include "graphics/stk_tex_manager.hpp"
+#include "karts/kart_properties.hpp"
+#include "karts/kart_properties_manager.hpp"
 #include "replay/replay_play.hpp"
 #include "states_screens/ghost_replay_selection.hpp"
 #include "states_screens/state_manager.hpp"
@@ -32,7 +35,7 @@ using namespace irr::core;
 // -----------------------------------------------------------------------------
 GhostReplayInfoDialog::GhostReplayInfoDialog(unsigned int replay_id,
                      uint64_t compare_replay_uid, bool compare_ghost)
-                      : ModalDialog(0.85f,0.65f), m_replay_id(replay_id)
+                      : ModalDialog(0.95f,0.75f), m_replay_id(replay_id)
 {
     m_self_destroy         = false;
     m_record_race          = false;
@@ -52,7 +55,7 @@ GhostReplayInfoDialog::GhostReplayInfoDialog(unsigned int replay_id,
     m_track_screenshot_widget->m_tab_stop = false;
 
     // temporary icon, will replace it just after (but it will be shown if the given icon is not found)
-    m_track_screenshot_widget->m_properties[PROP_ICON] = "gui/main_help.png";
+    m_track_screenshot_widget->m_properties[PROP_ICON] = "gui/icons/main_help.png";
 
     irr::video::ITexture* image = STKTexManager::getInstance()
         ->getTexture(track->getScreenshotFile(),
@@ -69,6 +72,11 @@ GhostReplayInfoDialog::GhostReplayInfoDialog(unsigned int replay_id,
     //        to make this unselectable by keyboard/mouse
     m_replay_info_widget = getWidget<GUIEngine::ListWidget>("current_replay_info");
     assert(m_replay_info_widget != NULL);
+
+    /* Used to display kart icons for the selected replay(s) */
+    irr::gui::STKModifiedSpriteBank *icon_bank = GhostReplaySelection::getInstance()->getIconBank();
+    int icon_height = getHeight()/18;
+    m_replay_info_widget->setIcons(icon_bank, (int)icon_height);
 
     updateReplayDisplayedInfo();
 
@@ -132,18 +140,20 @@ void GhostReplayInfoDialog::updateReplayDisplayedInfo()
     // as the header doesn't work with modal dialogs
     if (is_linear)
         row.push_back(GUIEngine::ListWidget::ListCell
-            (_("Reverse"), -1, 3, true));
+            (_C("ghost_info", "Reverse"), -1, 3, true));
     row.push_back(GUIEngine::ListWidget::ListCell
-        (_("Difficulty"), -1, 4, true));
+        (_C("ghost_info", "Difficulty"), -1, 4, true));
     if (is_linear)
         row.push_back(GUIEngine::ListWidget::ListCell
-            (_("Laps"), -1, 3, true));
+            (_C("ghost_info", "Laps"), -1, 3, true));
     row.push_back(GUIEngine::ListWidget::ListCell
-        (_("Time"), -1, 4, true));
+        (_C("ghost_info", "Time"), -1, 3, true));
     row.push_back(GUIEngine::ListWidget::ListCell
-        (_("User"), -1, 5, true));
+        (_C("ghost_info", "Kart"), -1, 1, true));
     row.push_back(GUIEngine::ListWidget::ListCell
-        (_("Version"), -1, 3, true));
+        (_C("ghost_info", "User"), -1, 5, true));
+    row.push_back(GUIEngine::ListWidget::ListCell
+        (_C("ghost_info", "Version"), -1, 2, true));
 
     m_replay_info_widget->addItem(StringUtils::toString(0), row);
 
@@ -164,6 +174,24 @@ void GhostReplayInfoDialog::updateReplayDisplayedInfo()
 
         const ReplayPlay::ReplayData& rd = ReplayPlay::get()->getReplayData(id);
 
+        int icon = -1;
+
+        for(unsigned int i=0; i<kart_properties_manager->getNumberOfKarts(); i++)
+        {
+            const KartProperties* prop = kart_properties_manager->getKartById(i);
+            if (rd.m_kart_list[0] == prop->getIdent())
+            {
+                icon = i;
+                break;
+            }
+        }
+
+        if (icon == -1)
+        {
+            icon = GhostReplaySelection::getInstance()->getUnknownKartIcon();
+            Log::warn("GhostReplayInfoDialog", "Kart not found, using default icon.");
+        }
+
         if (is_linear)
             row.push_back(GUIEngine::ListWidget::ListCell
                 (rd.m_reverse ? _("Yes") : _("No"), -1, 3, true));
@@ -175,11 +203,13 @@ void GhostReplayInfoDialog::updateReplayDisplayedInfo()
             row.push_back(GUIEngine::ListWidget::ListCell
                 (StringUtils::toWString(rd.m_laps), -1, 3, true));
         row.push_back(GUIEngine::ListWidget::ListCell
-            (StringUtils::toWString(rd.m_min_time) + L"s", -1, 4, true));
+            (StringUtils::toWString(rd.m_min_time) + L"s", -1, 3, true));
+        row.push_back(GUIEngine::ListWidget::ListCell
+            ("", icon, 1, true));
         row.push_back(GUIEngine::ListWidget::ListCell
             (rd.m_user_name.empty() ? " " : rd.m_user_name, -1, 5, true));
         row.push_back(GUIEngine::ListWidget::ListCell
-            (rd.m_stk_version.empty() ? " " : rd.m_stk_version, -1, 3, true));
+            (rd.m_stk_version.empty() ? " " : rd.m_stk_version, -1, 2, true));
 
         m_replay_info_widget->addItem(StringUtils::toString(i), row);
     } // for num_replays_to_list

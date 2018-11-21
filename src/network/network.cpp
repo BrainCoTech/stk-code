@@ -71,6 +71,8 @@ Network::Network(int peer_count, int channel_limit,
         // Any port
         new_addr.port = 0;
         m_host = enet_host_create(&new_addr, peer_count, channel_limit, 0, 0);
+        if (!m_host)
+            Log::fatal("Network", "Failed to create socket with any port.");
     }
 }   // Network
 
@@ -181,8 +183,9 @@ int Network::receiveRawPacket(char *buffer, int buf_len,
 void Network::broadcastPacket(NetworkString *data, bool reliable)
 {
     ENetPacket* packet = enet_packet_create(data->getData(), data->size() + 1,
-                                      reliable ? ENET_PACKET_FLAG_RELIABLE
-                                               : ENET_PACKET_FLAG_UNSEQUENCED);
+        (reliable ? ENET_PACKET_FLAG_RELIABLE :
+        (ENET_PACKET_FLAG_UNSEQUENCED | ENET_PACKET_FLAG_UNRELIABLE_FRAGMENT))
+        );
     enet_host_broadcast(m_host, 0, packet);
 }   // broadcastPacket
 

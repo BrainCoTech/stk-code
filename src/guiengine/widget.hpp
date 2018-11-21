@@ -189,6 +189,22 @@ namespace GUIEngine
          */
         virtual EventPropagation leftPressed (const int playerID) { return EVENT_BLOCK; }
 
+        /**
+          * called when up key is pressed and focus is on widget.
+          * Returns 'EVENT_LET' if user's event handler should be notified of a change.
+          * Override in children to be notified of up/down events and/or make
+          * the event propagate to the user's event handler.
+          */
+        virtual EventPropagation upPressed(const int playerID) { return EVENT_BLOCK; }
+
+        /**
+          * called when down key is pressed and focus is on widget.
+          * Returns 'EVENT_LET' if user's event handler should be notified of a change.
+          * Override in children to be notified of up/down events and/or make
+          * the event propagate to the user's event handler.
+          */
+        virtual EventPropagation downPressed(const int playerID) { return EVENT_BLOCK; }
+
         /** used when you set eventSupervisors - see m_event_handler explainations below
             called when one of a widget's children is hovered.
             \return 'EVENT_LET' if main event handler should be notified of a change, 'EVENT_BLOCK' otherwise */
@@ -658,7 +674,7 @@ namespace GUIEngine
         bool ok() const { return (m_magic_number == 0xCAFEC001); }
 
         /** Gets called when the widget is active and got clicked. (Only works for button widgets for now.) */
-        virtual void onClick()  { }
+        virtual EventPropagation onClick()  { return EVENT_LET; }
         virtual irr::core::dimension2di getDimension() const { return irr::core::dimension2di(m_w, m_h); }
     };
 

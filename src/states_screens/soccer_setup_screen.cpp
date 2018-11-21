@@ -23,7 +23,6 @@
 #include "guiengine/widgets/bubble_widget.hpp"
 #include "guiengine/widgets/button_widget.hpp"
 #include "guiengine/widgets/spinner_widget.hpp"
-#include "guiengine/widgets/check_box_widget.hpp"
 #include "guiengine/widgets/label_widget.hpp"
 #include "guiengine/widgets/model_view_widget.hpp"
 #include "guiengine/scalable_font.hpp"
@@ -90,8 +89,8 @@ void SoccerSetupScreen::eventCallback(Widget* widget, const std::string& name,
     }
     else if(name == "time_enabled")
     {
-        CheckBoxWidget* timeEnabled = dynamic_cast<CheckBoxWidget*>(widget);
-        bool timed = timeEnabled->getState();
+        SpinnerWidget* timeEnabled = dynamic_cast<SpinnerWidget*>(widget);
+        bool timed = timeEnabled->getValue() == 0;
         UserConfigParams::m_soccer_use_time_limit = timed;
         getWidget<SpinnerWidget>("goalamount")->setActive(!timed);
         getWidget<SpinnerWidget>("timeamount")->setActive(timed);
@@ -100,14 +99,14 @@ void SoccerSetupScreen::eventCallback(Widget* widget, const std::string& name,
     {
         if (m_kart_view_info.size() == 1)
         {
-            changeTeam(0, SOCCER_TEAM_RED);
+            changeTeam(0, KART_TEAM_RED);
         }
     }
     else if (name == "blue_team")
     {
         if (m_kart_view_info.size() == 1)
         {
-            changeTeam(0, SOCCER_TEAM_BLUE);
+            changeTeam(0, KART_TEAM_BLUE);
         }
     }
 }   // eventCallback
@@ -120,11 +119,11 @@ void SoccerSetupScreen::beforeAddingWidget()
     // Add red/blue team icon above the karts
     IconButtonWidget*    red = getWidget<IconButtonWidget>("red_team");
     IconButtonWidget*    blue = getWidget<IconButtonWidget>("blue_team");
-    red->m_x = central_div->m_x + central_div->m_w/4;
-    red->m_y = central_div->m_y + red->m_h;
+    red->m_x = central_div->m_x + central_div->m_w/4 - red->m_w/2;
+    red->m_y = central_div->m_y + (int)(red->m_h * 0.5f);
 
-    blue->m_x = central_div->m_x + (central_div->m_w/4)*3;
-    blue->m_y = central_div->m_y + blue->m_h;
+    blue->m_x = central_div->m_x + (central_div->m_w/4)*3 - blue->m_w/2;
+    blue->m_y = central_div->m_y + (int)(blue->m_h * 0.5f);
 
     // Add the 3D views for the karts
     int nb_players = race_manager->getNumPlayers();
@@ -149,15 +148,15 @@ void SoccerSetupScreen::beforeAddingWidget()
         KartViewInfo info;
 
         int single_team  = UserConfigParams::m_soccer_default_team;
-        info.team = (nb_players == 1 ? (SoccerTeam)single_team :
-            (i&1 ? SOCCER_TEAM_BLUE : SOCCER_TEAM_RED));
+        info.team = (nb_players == 1 ? (KartTeam)single_team :
+            (i&1 ? KART_TEAM_BLUE : KART_TEAM_RED));
 
         // addModel requires loading the RenderInfo first
         info.support_colorization = kart_model.supportColorization();
         if (info.support_colorization)
         {
             kart_view->getModelViewRenderInfo()->setHue
-                (info.team == SOCCER_TEAM_BLUE ? 0.66f : 1.0f);
+                (info.team == KART_TEAM_BLUE ? 0.66f : 1.0f);
         }
 
         core::matrix4 model_location;
@@ -198,7 +197,7 @@ void SoccerSetupScreen::beforeAddingWidget()
         info.view  = kart_view;
         info.confirmed  = false;
         m_kart_view_info.push_back(info);
-        race_manager->setKartSoccerTeam(i, info.team);
+        race_manager->setKartTeam(i, info.team);
     }
 
     // Update layout
@@ -226,8 +225,11 @@ void SoccerSetupScreen::init()
     timeAmount->setValue(UserConfigParams::m_soccer_time_limit);
     timeAmount->setActive(UserConfigParams::m_soccer_use_time_limit);
 
-    CheckBoxWidget* timeEnabled = getWidget<CheckBoxWidget>("time_enabled");
-    timeEnabled->setState(UserConfigParams::m_soccer_use_time_limit);
+    SpinnerWidget* timeEnabled = getWidget<SpinnerWidget>("time_enabled");
+    timeEnabled->clearLabels();
+    timeEnabled->addLabel(_("Time limit"));
+    timeEnabled->addLabel(_("Goals limit"));
+    timeEnabled->setValue(UserConfigParams::m_soccer_use_time_limit ? 0 : 1);
 
     // Set focus on "continue"
     ButtonWidget* bt_continue = getWidget<ButtonWidget>("continue");
@@ -265,9 +267,9 @@ void SoccerSetupScreen::tearDown()
     Screen::tearDown();
 }   // tearDown
 
-void SoccerSetupScreen::changeTeam(int player_id, SoccerTeam team)
+void SoccerSetupScreen::changeTeam(int player_id, KartTeam team)
 {
-    if (team == SOCCER_TEAM_NONE)
+    if (team == KART_TEAM_NONE)
         return;
 
     if (team == m_kart_view_info[player_id].team)
@@ -276,7 +278,7 @@ void SoccerSetupScreen::changeTeam(int player_id, SoccerTeam team)
     // Change the kart color
     if (m_kart_view_info[player_id].support_colorization)
     {
-        const float hue = team == SOCCER_TEAM_RED ? 1.0f : 0.66f;
+        const float hue = team == KART_TEAM_RED ? 1.0f : 0.66f;
         m_kart_view_info[player_id].view->getModelViewRenderInfo()
             ->setHue(hue);
     }
@@ -291,7 +293,7 @@ void SoccerSetupScreen::changeTeam(int player_id, SoccerTeam team)
         UserConfigParams::m_soccer_default_team = (int)team;
     }
 
-    race_manager->setKartSoccerTeam(player_id, team);
+    race_manager->setKartTeam(player_id, team);
     m_kart_view_info[player_id].team = team;
     updateKartViewsLayout();
 }
@@ -322,7 +324,7 @@ GUIEngine::EventPropagation SoccerSetupScreen::filterActions(PlayerAction action
             bubble->isFocusedForPlayer(PLAYER_ID_GAME_MASTER))
         {
             if (m_kart_view_info[playerId].confirmed == false)
-                changeTeam(playerId, SOCCER_TEAM_RED);
+                changeTeam(playerId, KART_TEAM_RED);
 
             return EVENT_BLOCK;
         }
@@ -332,7 +334,7 @@ GUIEngine::EventPropagation SoccerSetupScreen::filterActions(PlayerAction action
             bubble->isFocusedForPlayer(PLAYER_ID_GAME_MASTER))
         {
             if (m_kart_view_info[playerId].confirmed == false)
-                changeTeam(playerId, SOCCER_TEAM_BLUE);
+                changeTeam(playerId, KART_TEAM_BLUE);
 
             return EVENT_BLOCK;
         }
@@ -463,7 +465,7 @@ void SoccerSetupScreen::updateKartViewsLayout()
 
     // Compute/get some dimensions
     const int nb_columns = 2;   // two karts maximum per column
-    const int kart_area_width = (central_div->m_w) / 2; // size of one half of the screen
+    const int kart_area_width = (int)((central_div->m_w) / 2 * 0.8f); // size of one half of the screen with some margin
     const int kart_view_size = kart_area_width/nb_columns;  // Size (width and height) of a kart view
     const int center_x = central_div->m_x + central_div->m_w/2;
     const int center_y = central_div->m_y + central_div->m_h/2;
@@ -490,7 +492,7 @@ void SoccerSetupScreen::updateKartViewsLayout()
     for(int i=0 ; i < nb_players ; i++)
     {
         const KartViewInfo& view_info = m_kart_view_info[i];
-        const SoccerTeam    team = view_info.team;
+        const KartTeam    team = view_info.team;
 
         // Compute the position
         const int cur_row = cur_kart_per_team[team] / nb_columns;

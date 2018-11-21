@@ -559,8 +559,8 @@ bool KartSelectionScreen::joinPlayer(InputDevice* device, PlayerProfile* p)
     // we need to select something for them
     w->setSelection(new_player_id, new_player_id, true);
 
-    newPlayerWidget->m_player_ident_spinner
-                   ->setFocusForPlayer(new_player_id);
+    //newPlayerWidget->m_player_ident_spinner
+    //               ->setFocusForPlayer(new_player_id);
 
     if (!m_multiplayer)
     {
@@ -738,11 +738,6 @@ void KartSelectionScreen::playerConfirm(const int player_id)
         return;
     }
 
-    if (player_id == PLAYER_ID_GAME_MASTER)
-    {
-        UserConfigParams::m_default_kart = selection;
-    }
-
     if (m_kart_widgets[player_id].getKartInternalName().size() == 0 ||
         m_kart_widgets[player_id].getKartInternalName() == RibbonWidget::NO_ITEM_ID)
     {
@@ -835,6 +830,11 @@ void KartSelectionScreen::updateKartStats(uint8_t widget_id,
         w->setValues(kp, m_kart_widgets[widget_id].getDifficulty());
         w->update(0);
     }
+    else
+    {
+        w->hideAll();
+        w->update(0);
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -859,7 +859,7 @@ void KartSelectionScreen::updateKartWidgetModel(int widget_id,
         w3->addModel(model, model_location);
         w3->update(0);
         m_kart_widgets[widget_id].m_kart_name
-        ->setText( _("Random Kart"), false );
+            ->setText( _("Random Kart"), false );
     }
     // selection contains the name of the kart, so check only for substr
     else if (StringUtils::startsWith(selection, ID_LOCKED) && !m_multiplayer)
@@ -1245,6 +1245,11 @@ void KartSelectionScreen::allPlayersDone()
                 }
             }
         }
+        
+        if (n == PLAYER_ID_GAME_MASTER)
+        {
+            UserConfigParams::m_default_kart = selected_kart;
+        }
 
         race_manager->setPlayerKart(n, selected_kart);
 
@@ -1455,6 +1460,24 @@ void KartSelectionScreen::renumberKarts()
 }   // renumberKarts
 
 // ----------------------------------------------------------------------------
+PtrVector<const KartProperties, REF> KartSelectionScreen::getUsableKarts(
+    const std::string& selected_kart_group)
+{
+    PtrVector<const KartProperties, REF> karts;
+    for(unsigned int i=0; i<kart_properties_manager->getNumberOfKarts(); i++)
+    {
+        const KartProperties* prop = kart_properties_manager->getKartById(i);
+        // Ignore karts that are not in the selected group
+        if((selected_kart_group != ALL_KART_GROUPS_ID &&
+            !prop->isInGroup(selected_kart_group)) || isIgnored(prop->getIdent()))
+            continue;
+        karts.push_back(prop);
+    }
+    karts.insertionSort();
+    return karts;
+}   // getUsableKarts
+
+// ----------------------------------------------------------------------------
 
 void KartSelectionScreen::setKartsFromCurrentGroup()
 {
@@ -1479,18 +1502,16 @@ void KartSelectionScreen::setKartsFromCurrentGroup()
     w->clearItems();
 
     int usable_kart_count = 0;
-    PtrVector<const KartProperties, REF> karts;
+    PtrVector<const KartProperties, REF> karts = getUsableKarts(selected_kart_group);
 
-    for(unsigned int i=0; i<kart_properties_manager->getNumberOfKarts(); i++)
+    if (karts.empty())
     {
-        const KartProperties* prop = kart_properties_manager->getKartById(i);
-        // Ignore karts that are not in the selected group
-        if((selected_kart_group != ALL_KART_GROUPS_ID &&
-            !prop->isInGroup(selected_kart_group)) || isIgnored(prop->getIdent()))
-            continue;
-        karts.push_back(prop);
+        // In network this will happen if no addons kart on server
+        PtrVector<const KartProperties, REF> new_karts =
+            getUsableKarts(DEFAULT_GROUP_NAME);
+        std::swap(karts.m_contents_vector, new_karts.m_contents_vector);
+        tabs->select(DEFAULT_GROUP_NAME, PLAYER_ID_GAME_MASTER);
     }
-    karts.insertionSort();
 
     for(unsigned int i=0; i<karts.size(); i++)
     {
@@ -1516,7 +1537,7 @@ void KartSelectionScreen::setKartsFromCurrentGroup()
     // add random
     if (usable_kart_count > 1)
     {
-        w->addItem(_("Random Kart"), RANDOM_KART_ID, "/gui/random_kart.png");
+        w->addItem(_("Random Kart"), RANDOM_KART_ID, "/gui/icons/random_kart.png");
     }
 
     w->updateItemDisplay();

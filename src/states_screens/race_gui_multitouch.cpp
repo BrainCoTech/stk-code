@@ -40,7 +40,7 @@ using namespace irr;
 RaceGUIMultitouch::RaceGUIMultitouch(RaceGUIBase* race_gui)
 {
     m_race_gui = race_gui;
-    m_minimap_bottom = 0;
+    m_height = 0;
     m_gui_action = false;
     m_steering_wheel_tex = NULL;
     m_up_down_tex = NULL;
@@ -56,13 +56,13 @@ RaceGUIMultitouch::RaceGUIMultitouch(RaceGUIBase* race_gui)
 
     m_device = input_manager->getDeviceManager()->getMultitouchDevice();
 
-    if (UserConfigParams::m_multitouch_scale > 1.5f)
+    if (UserConfigParams::m_multitouch_scale > 1.6f)
     {
-        UserConfigParams::m_multitouch_scale = 1.5f;
+        UserConfigParams::m_multitouch_scale = 1.6f;
     }
-    else if (UserConfigParams::m_multitouch_scale < 0.5f)
+    else if (UserConfigParams::m_multitouch_scale < 0.8f)
     {
-        UserConfigParams::m_multitouch_scale = 0.5f;
+        UserConfigParams::m_multitouch_scale = 0.8f;
     }
 
     init();
@@ -104,6 +104,11 @@ void RaceGUIMultitouch::close()
     {
         m_device->deactivateAccelerometer();
     }
+
+    if (m_device->isGyroscopeActive())
+    {
+        m_device->deactivateGyroscope();
+    }
 }   // close
 
 
@@ -116,9 +121,14 @@ void RaceGUIMultitouch::init()
     if (m_device == NULL)
         return;
         
-    if (UserConfigParams::m_multitouch_controls == 2)
+    if (UserConfigParams::m_multitouch_controls == MULTITOUCH_CONTROLS_ACCELEROMETER)
     {
         m_device->activateAccelerometer();
+    }
+    if (UserConfigParams::m_multitouch_controls == MULTITOUCH_CONTROLS_GYROSCOPE)
+    {
+        m_device->activateAccelerometer();
+        m_device->activateGyroscope();
     }
 
     const float scale = UserConfigParams::m_multitouch_scale;
@@ -138,29 +148,33 @@ void RaceGUIMultitouch::init()
 
     float first_column_x = w - 2 * col_size;
     float second_column_x = w - 1 * col_size;
-    float steering_btn_margin = 0.6f * margin;
-    float steering_btn_x = steering_btn_margin;
-    float steering_btn_y = h - steering_btn_margin - btn2_size;
+    float steering_wheel_margin = 0.6f * margin;
+    float steering_wheel_x = steering_wheel_margin;
+    float steering_wheel_y = h - steering_wheel_margin - btn2_size;
+    float steering_accel_margin = margin;
+    float steering_accel_x = steering_accel_margin;
+    float steering_accel_y = h - steering_accel_margin - btn2_size;
     
     if (UserConfigParams::m_multitouch_inverted)
     {
         first_column_x = margin + 1 * col_size;
         second_column_x = margin;
-        steering_btn_x = w - btn2_size - steering_btn_margin;
+        steering_wheel_x = w - btn2_size - steering_wheel_margin;
+        steering_accel_x = w - btn2_size / 2 - steering_accel_margin;
     }
 
-    m_minimap_bottom = (unsigned int)(h - 2 * col_size);
+    m_height = (unsigned int)(2 * col_size + margin / 2);
     
-    if (m_device->isAccelerometerActive())
+    if (m_device->isAccelerometerActive() || m_device->isGyroscopeActive())
     {
         m_device->addButton(BUTTON_UP_DOWN,
-                    int(steering_btn_x + btn2_size / 4), int(steering_btn_y),
+                    int(steering_accel_x), int(steering_accel_y),
                     int(btn2_size / 2), int(btn2_size));
     }
     else
     {
         m_device->addButton(BUTTON_STEERING,
-                            int(steering_btn_x), int(steering_btn_y),
+                            int(steering_wheel_x), int(steering_wheel_y),
                             int(btn2_size), int(btn2_size));
     }
 
@@ -183,24 +197,24 @@ void RaceGUIMultitouch::init()
                         int(first_column_x), int(h - 1 * col_size),
                         int(btn_size), int(btn_size));
                       
-    m_steering_wheel_tex = irr_driver->getTexture(FileManager::GUI, 
+    m_steering_wheel_tex = irr_driver->getTexture(FileManager::GUI_ICON, 
                                                   "android/steering_wheel.png");
-    m_up_down_tex = irr_driver->getTexture(FileManager::GUI, 
+    m_up_down_tex = irr_driver->getTexture(FileManager::GUI_ICON, 
                                                          "android/up_down.png");
-    m_pause_tex = irr_driver->getTexture(FileManager::GUI, "android/pause.png");
-    m_nitro_tex = irr_driver->getTexture(FileManager::GUI, "android/nitro.png");
-    m_nitro_empty_tex = irr_driver->getTexture(FileManager::GUI, 
+    m_pause_tex = irr_driver->getTexture(FileManager::GUI_ICON, "android/pause.png");
+    m_nitro_tex = irr_driver->getTexture(FileManager::GUI_ICON, "android/nitro.png");
+    m_nitro_empty_tex = irr_driver->getTexture(FileManager::GUI_ICON, 
                                                      "android/nitro_empty.png");
-    m_wing_mirror_tex = irr_driver->getTexture(FileManager::GUI, 
+    m_wing_mirror_tex = irr_driver->getTexture(FileManager::GUI_ICON, 
                                                      "android/wing_mirror.png");
-    m_thunderbird_reset_tex = irr_driver->getTexture(FileManager::GUI, 
+    m_thunderbird_reset_tex = irr_driver->getTexture(FileManager::GUI_ICON, 
                                                "android/thunderbird_reset.png");
-    m_drift_tex = irr_driver->getTexture(FileManager::GUI, "android/drift.png");
-    m_bg_button_tex = irr_driver->getTexture(FileManager::GUI, 
+    m_drift_tex = irr_driver->getTexture(FileManager::GUI_ICON, "android/drift.png");
+    m_bg_button_tex = irr_driver->getTexture(FileManager::GUI_ICON, 
                                                   "android/blur_bg_button.png");
-    m_bg_button_focus_tex = irr_driver->getTexture(FileManager::GUI, 
+    m_bg_button_focus_tex = irr_driver->getTexture(FileManager::GUI_ICON, 
                                             "android/blur_bg_button_focus.png");
-    m_gui_action_tex = irr_driver->getTexture(FileManager::GUI,"challenge.png");
+    m_gui_action_tex = irr_driver->getTexture(FileManager::GUI_ICON,"challenge.png");
 
 } // init
 
@@ -336,6 +350,7 @@ void RaceGUIMultitouch::draw(const AbstractKart* kart,
             }
             else if (button->type == MultitouchButtonType::BUTTON_FIRE &&
                      kart->getPowerup()->getNum() > 1 && 
+                     !kart->hasFinishedRace() &&
                      m_gui_action == false)
             {
                 gui::ScalableFont* font = GUIEngine::getHighresDigitFont();

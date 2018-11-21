@@ -20,6 +20,7 @@
 
 #include "karts/abstract_kart.hpp"
 #include "karts/kart_properties.hpp"
+#include "race/race_manager.hpp"
 #include "tracks/drive_graph.hpp"
 
 #include "ICameraSceneNode.h"
@@ -57,6 +58,8 @@ void CameraEnd::clearEndCameras()
 void CameraEnd::readEndCamera(const XMLNode &root)
 {
     m_end_cameras.clear();
+    if (race_manager->getMinorMode() == RaceManager::MINOR_MODE_EASTER_EGG)
+        return;
     for(unsigned int i=0; i<root.getNumNodes(); i++)
     {
         unsigned int index = i;
@@ -87,7 +90,7 @@ void CameraEnd::update(float dt)
     // First test if the kart is close enough to the next end camera, and
     // if so activate it.
     if( m_end_cameras.size()>0 &&
-        m_end_cameras[m_next_end_camera].isReached(m_kart->getXYZ()))
+        m_end_cameras[m_next_end_camera].isReached(m_kart->getSmoothedXYZ()))
     {
         m_current_end_camera = m_next_end_camera;
         if(m_end_cameras[m_current_end_camera].m_type
@@ -116,7 +119,7 @@ void CameraEnd::update(float dt)
             // after changing the relative position in order to get the right
             // position here).
             const core::vector3df &cp = m_camera->getPosition();
-            const Vec3            &kp = m_kart->getXYZ();
+            const Vec3            &kp = m_kart->getSmoothedXYZ();
             // Estimate the fov, assuming that the vector from the camera to
             // the kart and the kart length are orthogonal to each other
             // --> tan (fov) = kart_length / camera_kart_distance
@@ -125,7 +128,7 @@ void CameraEnd::update(float dt)
             float fov = 6*atan2(m_kart->getKartLength(),
                                 (cp-kp.toIrrVector()).getLength());
             m_camera->setFOV(fov);
-            m_camera->setTarget(m_kart->getXYZ().toIrrVector());
+            m_camera->setTarget(m_kart->getSmoothedXYZ().toIrrVector());
             break;
         }
     case EndCameraInformation::EC_AHEAD_OF_KART:
@@ -135,7 +138,7 @@ void CameraEnd::update(float dt)
 
             positionCamera(dt, /*above_kart*/0.75f,
                            cam_angle, /*side_way*/0,
-                           2.0f*getDistanceToKart(), /*smoothing*/false);
+                           2.0f*getDistanceToKart(), /*smoothing*/false, 0.0f);
             break;
         }
     default: break;

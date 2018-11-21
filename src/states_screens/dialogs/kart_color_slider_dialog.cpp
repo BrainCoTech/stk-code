@@ -25,6 +25,7 @@
 #include "graphics/irr_driver.hpp"
 #include "graphics/render_info.hpp"
 #include "guiengine/engine.hpp"
+#include "guiengine/widgets/label_widget.hpp"
 #include "guiengine/widgets/model_view_widget.hpp"
 #include "guiengine/widgets/spinner_widget.hpp"
 #include "states_screens/state_manager.hpp"
@@ -38,10 +39,31 @@ KartColorSliderDialog::KartColorSliderDialog(PlayerProfile* pp)
     loadFromFile("kart_color_slider.stkgui");
     m_player_profile = pp;
 
-    SpinnerWidget* color_slider = getWidget<SpinnerWidget>("color-slider");
-    color_slider->setValue(int(pp->getDefaultKartColor() * 100.0f));
-    m_model_view->getModelViewRenderInfo()->setHue(float(color_slider->getValue()) / 100.0f);
-    color_slider->setFocusForPlayer(PLAYER_ID_GAME_MASTER);
+    // I18N: In kart color choosing dialog
+    core::stringw original_color = _("Use original color");
+    // I18N: In kart color choosing dialog
+    core::stringw choose_color = _("Pick a color from slider");
+
+    m_toggle_slider->clearLabels();
+    m_toggle_slider->addLabel(original_color);
+    m_toggle_slider->addLabel(choose_color);
+
+    if (m_player_profile->getDefaultKartColor() != 0.0f)
+    {
+        m_toggle_slider->setValue(1);
+        m_color_slider->setActive(true);
+        m_color_slider->setValue(int(
+            m_player_profile->getDefaultKartColor() * 100.0f));
+        m_model_view->getModelViewRenderInfo()->setHue(
+            float(m_color_slider->getValue()) / 100.0f);
+    }
+    else
+    {
+        m_toggle_slider->setValue(0);
+        m_color_slider->setActive(false);
+        m_model_view->getModelViewRenderInfo()->setHue(0.0f);
+    }
+    m_toggle_slider->setFocusForPlayer(PLAYER_ID_GAME_MASTER);
 }   // KartColorSliderDialog
 
 // ----------------------------------------------------------------------------
@@ -127,22 +149,45 @@ void KartColorSliderDialog::beforeAddingWidgets()
 
     m_model_view->setRotateContinuously(35.0f);
     m_model_view->update(0);
+    m_toggle_slider = getWidget<SpinnerWidget>("toggle-slider");
+    m_color_slider = getWidget<SpinnerWidget>("color-slider");
 }   // beforeAddingWidgets
+
+// ----------------------------------------------------------------------------
+void KartColorSliderDialog::toggleSlider()
+{
+    if (m_toggle_slider->getValue() == 1)
+    {
+        m_color_slider->setActive(true);
+        m_color_slider->setValue(100);
+        m_model_view->getModelViewRenderInfo()->setHue(1.0f);
+    }
+    else
+    {
+        m_color_slider->setActive(false);
+        m_model_view->getModelViewRenderInfo()->setHue(0.0f);
+    }
+}   // toggleSlider
 
 // ----------------------------------------------------------------------------
 GUIEngine::EventPropagation
             KartColorSliderDialog::processEvent(const std::string& eventSource)
 {
-    if (eventSource == "color-slider")
+    if (eventSource == "toggle-slider")
+    {
+         toggleSlider();
+    }
+    else if (eventSource == "color-slider")
     {
         m_model_view->getModelViewRenderInfo()->setHue(float(
-            getWidget<SpinnerWidget>("color-slider")->getValue()) / 100.0f);
+            m_color_slider->getValue()) / 100.0f);
     }
     else if (eventSource == "close")
     {
-        float color = float(getWidget<SpinnerWidget>("color-slider")
-            ->getValue());
-        m_player_profile->setDefaultKartColor(color / 100.0f);
+        float color = 0.0f;
+        if (m_toggle_slider->getValue() == 1)
+            color = float(m_color_slider->getValue()) / 100.0f;
+        m_player_profile->setDefaultKartColor(color);
         ModalDialog::dismiss();
         return GUIEngine::EVENT_BLOCK;
     }

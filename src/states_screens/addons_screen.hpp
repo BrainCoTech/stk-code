@@ -73,22 +73,13 @@ private:
 
     bool             m_reloading;
 
-    /** \brief To check (and set) if sort order is descending **/
-    bool             m_sort_desc;
-
-    bool             m_sort_default;
-    
-    int              m_sort_col;
-
     /** List of date filters **/
     std::vector<DateFilter> m_date_filters;
-
-    bool             m_show_tips;
 
 public:
 
     /** Load the addons into the main list.*/
-    void loadList();
+    void loadList(bool sort_desc = false);
 
     /** \brief implement callback from parent class GUIEngine::Screen */
     virtual void loadedFromFile() OVERRIDE;
@@ -102,7 +93,7 @@ public:
     /** \brief implement callback from parent class GUIEngine::Screen */
     virtual void beforeAddingWidget() OVERRIDE;
 
-    virtual void onColumnClicked(int columnId) OVERRIDE;
+    virtual void onColumnClicked(int column_id, bool sort_desc, bool sort_default) OVERRIDE;
 
     virtual void init() OVERRIDE;
     virtual void tearDown() OVERRIDE;

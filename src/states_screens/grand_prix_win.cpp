@@ -84,8 +84,6 @@ const float KARTS_INITIAL_Z[3] = { 44.9f, 40.9f, 36.9f };
 
 // Locations for karts to go to, should be the locations of the podiums (End Stage 1)
 const float KARTS_PODIUM_X[3] = { 20.5f, 20.75f, 21.0f };
-const float KARTS_PODIUM_Y[3] = {KARTS_INITIAL_Y[0], KARTS_INITIAL_Y[1], KARTS_INITIAL_Y[2]};
-const float KARTS_PODIUM_Z[3] = {KARTS_INITIAL_Z[0], KARTS_INITIAL_Z[1], KARTS_INITIAL_Z[2]};
 
 // Rotations for karts to go to in Stage 2
 const float KARTS_AND_PODIUMS_FINAL_ROTATION[3] = { 270.0f, 270.0f, 270.0f };
@@ -115,6 +113,7 @@ GrandPrixWin::GrandPrixWin() : GrandPrixCutscene("grand_prix_win.stkgui")
         m_kart_node[i] = NULL;
         m_podium_steps[i] = NULL;
     }
+    m_player_won = false;
 }   // GrandPrixWin
 
 // -------------------------------------------------------------------------------------
@@ -177,7 +176,7 @@ void GrandPrixWin::init()
         core::rect< s32 > iconarea(label_x_from - label_height, y_from,
                                    label_x_from,                y_to);
         IGUIImage* img = GUIEngine::getGUIEnv()->addImage( iconarea );
-        img->setImage( irr_driver->getTexture( FileManager::GUI, "cup_gold.png") );
+        img->setImage( irr_driver->getTexture( FileManager::GUI_ICON, "cup_gold.png") );
         img->setScaleImage(true);
         img->setTabStop(false);
         img->setUseAlphaChannel(true);
@@ -185,7 +184,7 @@ void GrandPrixWin::init()
         core::rect< s32 > icon2area(label_x_to,                y_from,
                                     label_x_to + label_height, y_to);
         img = GUIEngine::getGUIEnv()->addImage( icon2area );
-        img->setImage( irr_driver->getTexture( FileManager::GUI,"cup_gold.png") );
+        img->setImage( irr_driver->getTexture( FileManager::GUI_ICON,"cup_gold.png") );
         img->setScaleImage(true);
         img->setTabStop(false);
         img->setUseAlphaChannel(true);
@@ -318,10 +317,11 @@ void GrandPrixWin::onUpdate(float dt)
 
     static int test_y = 0;
 
-    GUIEngine::getTitleFont()->draw(_("You completed the Grand Prix!"),
-                                    core::rect< s32 >( 0, test_y, w, h/10 ),
-                                    color,
-                                    true/* center h */, true /* center v */ );
+    irr::core::stringw message = (m_player_won) ? _("You won the Grand Prix!") :
+                                                  _("You completed the Grand Prix!");
+
+    GUIEngine::getTitleFont()->draw(message, core::rect< s32 >( 0, test_y, w, h/10 ),
+                                    color, true/* center h */, true /* center v */ );
 }   // onUpdate
 
 

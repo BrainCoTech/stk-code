@@ -37,7 +37,7 @@
 #include "race/highscore_manager.hpp"
 #include "race/race_manager.hpp"
 #include "states_screens/state_manager.hpp"
-#include "states_screens/tracks_screen.hpp"
+#include "states_screens/online/tracks_screen.hpp"
 #include "tracks/track.hpp"
 #include "tracks/track_manager.hpp"
 #include "utils/string_utils.hpp"
@@ -72,13 +72,11 @@ void TrackInfoScreen::loadedFromFile()
 
     m_highscore_label = getWidget<LabelWidget>("highscores");
 
-    m_kart_icons[0] = getWidget<IconButtonWidget>("iconscore1");
-    m_kart_icons[1] = getWidget<IconButtonWidget>("iconscore2");
-    m_kart_icons[2] = getWidget<IconButtonWidget>("iconscore3");
-
-    m_highscore_entries[0] = getWidget<LabelWidget>("highscore1");
-    m_highscore_entries[1] = getWidget<LabelWidget>("highscore2");
-    m_highscore_entries[2] = getWidget<LabelWidget>("highscore3");
+    for (unsigned int i=0;i<HIGHSCORE_COUNT;i++)
+    {
+        m_kart_icons[i] = getWidget<IconButtonWidget>(("iconscore"+StringUtils::toString(i+1)).c_str());
+        m_highscore_entries[i] = getWidget<LabelWidget>(("highscore"+StringUtils::toString(i+1)).c_str());
+    }
     
     GUIEngine::IconButtonWidget* screenshot = getWidget<IconButtonWidget>("screenshot");
     screenshot->setFocusable(false);
@@ -124,7 +122,7 @@ void TrackInfoScreen::init()
     // images are saved squared, but must be stretched to 4:
 
     // temporary icon, will replace it just after (but it will be shown if the given icon is not found)
-    screenshot->m_properties[PROP_ICON] = "gui/main_help.png";
+    screenshot->m_properties[PROP_ICON] = "gui/icons/main_help.png";
 
     ITexture* image = STKTexManager::getInstance()
         ->getTexture(m_track->getScreenshotFile(),
@@ -155,7 +153,7 @@ void TrackInfoScreen::init()
     // -------------
     const int local_players = race_manager->getNumLocalPlayers();
     const bool has_AI =
-        (race_manager->getMinorMode() == RaceManager::MINOR_MODE_3_STRIKES ||
+        (race_manager->getMinorMode() == RaceManager::MINOR_MODE_BATTLE ||
          race_manager->getMinorMode() == RaceManager::MINOR_MODE_SOCCER ?
          m_track->hasNavMesh() && (max_arena_players - local_players) > 0 :
          race_manager->hasAI());
@@ -177,7 +175,7 @@ void TrackInfoScreen::init()
 
         race_manager->setNumKarts(num_ai + local_players);
         // Set the max karts supported based on the battle arena selected
-        if(race_manager->getMinorMode()==RaceManager::MINOR_MODE_3_STRIKES ||
+        if(race_manager->getMinorMode()==RaceManager::MINOR_MODE_BATTLE ||
            race_manager->getMinorMode()==RaceManager::MINOR_MODE_SOCCER)
         {
             m_ai_kart_spinner->setMax(max_arena_players - local_players);
@@ -190,7 +188,7 @@ void TrackInfoScreen::init()
             m_ai_kart_spinner->setMin(std::max(0, 3 - local_players));
         }
         // Make sure in battle and soccer mode at least 1 ai for single player
-        else if((race_manager->getMinorMode()==RaceManager::MINOR_MODE_3_STRIKES ||
+        else if((race_manager->getMinorMode()==RaceManager::MINOR_MODE_BATTLE ||
             race_manager->getMinorMode()==RaceManager::MINOR_MODE_SOCCER) &&
             local_players == 1 &&
             !UserConfigParams::m_artist_debug_mode)
@@ -225,6 +223,10 @@ void TrackInfoScreen::init()
     {
         m_option->setState(race_manager->getReverseTrack());
     }
+    else if (random_item)
+    {
+        m_option->setState(UserConfigParams::m_random_arena_item);
+    }
     else
         m_option->setState(false);
 
@@ -255,13 +257,11 @@ void TrackInfoScreen::init()
     // ---- High Scores
     m_highscore_label->setVisible(has_highscores);
 
-    m_kart_icons[0]->setVisible(has_highscores);
-    m_kart_icons[1]->setVisible(has_highscores);
-    m_kart_icons[2]->setVisible(has_highscores);
-
-    m_highscore_entries[0]->setVisible(has_highscores);
-    m_highscore_entries[1]->setVisible(has_highscores);
-    m_highscore_entries[2]->setVisible(has_highscores);
+    for (unsigned int i=0;i<HIGHSCORE_COUNT;i++)
+    {
+        m_kart_icons[i]->setVisible(has_highscores);
+        m_highscore_entries[i]->setVisible(has_highscores);
+    }
 
     RibbonWidget* bt_start = getWidget<GUIEngine::RibbonWidget>("buttons");
     bt_start->setFocusForPlayer(PLAYER_ID_GAME_MASTER);
@@ -298,6 +298,8 @@ void TrackInfoScreen::updateHighScores()
     core::stringw name;
     float time;
 
+    int time_precision = race_manager->currentModeTimePrecision();
+
     // fill highscore entries
     for (int n=0; n<HIGHSCORE_COUNT; n++)
     {
@@ -308,7 +310,7 @@ void TrackInfoScreen::updateHighScores()
         {
             highscores->getEntry(n, kart_name, name, &time);
 
-            std::string time_string = StringUtils::timeToString(time);
+            std::string time_string = StringUtils::timeToString(time, time_precision);
 
             const KartProperties* prop = kart_properties_manager->getKart(kart_name);
             if (prop != NULL)
@@ -327,7 +329,7 @@ void TrackInfoScreen::updateHighScores()
 
             ITexture* no_kart_texture =
                 STKTexManager::getInstance()->getTexture
-                (file_manager->getAsset(FileManager::GUI, "random_kart.png"));
+                (file_manager->getAsset(FileManager::GUI_ICON, "random_kart.png"));
             m_kart_icons[n]->setImage(no_kart_texture);
 
         }
@@ -362,7 +364,7 @@ void TrackInfoScreen::onEnterPressedInternal()
     const int max_arena_players = m_track->getMaxArenaPlayers();
     const int local_players = race_manager->getNumLocalPlayers();
     const bool has_AI =
-        (race_manager->getMinorMode() == RaceManager::MINOR_MODE_3_STRIKES ||
+        (race_manager->getMinorMode() == RaceManager::MINOR_MODE_BATTLE ||
          race_manager->getMinorMode() == RaceManager::MINOR_MODE_SOCCER ?
          m_track->hasNavMesh() && (max_arena_players - local_players) > 0 :
          race_manager->hasAI());
@@ -451,3 +453,4 @@ void TrackInfoScreen::eventCallback(Widget* widget, const std::string& name,
 }   // eventCallback
 
 // ----------------------------------------------------------------------------
+

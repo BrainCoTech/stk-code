@@ -32,10 +32,12 @@
 #include "karts/abstract_kart.hpp"
 #include "karts/controller/controller.hpp"
 #include "karts/kart_properties_manager.hpp"
+#include "modes/capture_the_flag.hpp"
 #include "modes/cutscene_world.hpp"
 #include "modes/demo_world.hpp"
 #include "modes/easter_egg_hunt.hpp"
 #include "modes/follow_the_leader.hpp"
+#include "modes/free_for_all.hpp"
 #include "modes/overworld.hpp"
 #include "modes/profile_world.hpp"
 #include "modes/standard_race.hpp"
@@ -67,6 +69,7 @@ RaceManager::RaceManager()
     // Several code depends on this, e.g. kart_properties
     assert(DIFFICULTY_FIRST == 0);
     m_num_karts          = UserConfigParams::m_default_num_karts;
+    m_num_ghost_karts    = 0;
     m_difficulty         = DIFFICULTY_HARD;
     m_major_mode         = MAJOR_MODE_SINGLE;
     m_minor_mode         = MINOR_MODE_NORMAL_RACE;
@@ -76,6 +79,7 @@ RaceManager::RaceManager()
     m_started_from_overworld = false;
     m_have_kart_last_position_on_overworld = false;
     m_num_local_players = 0;
+    m_hit_capture_limit = 0;
     setMaxGoal(0);
     setTimeTarget(0.0f);
     setReverseTrack(false);
@@ -159,12 +163,12 @@ void RaceManager::setPlayerKart(unsigned int player_id,
 /** Sets additional information for a player to indicate which soccer team it
  *  belongs to.
 */
-void RaceManager::setKartSoccerTeam(unsigned int player_id, SoccerTeam team)
+void RaceManager::setKartTeam(unsigned int player_id, KartTeam team)
 {
     assert(player_id < m_player_karts.size());
 
-    m_player_karts[player_id].setSoccerTeam(team);
-}   // setKartSoccerTeam
+    m_player_karts[player_id].setKartTeam(team);
+}   // setKartTeam
 
 //-----------------------------------------------------------------------------
 /** Sets the per-player difficulty for a player.
@@ -318,11 +322,12 @@ void RaceManager::computeRandomKartList()
  */
 void RaceManager::startNew(bool from_overworld)
 {
-    unsigned int gk = 0;
+    m_num_ghost_karts = 0;
     if (m_has_ghost_karts)
-        gk = ReplayPlay::get()->getNumGhostKart();
+        m_num_ghost_karts = ReplayPlay::get()->getNumGhostKart();
 
     m_started_from_overworld = from_overworld;
+    if (m_started_from_overworld) m_continue_saved_gp = false;
     m_saved_gp = NULL; // There will be checks for this being NULL done later
 
     if (m_major_mode==MAJOR_MODE_GRAND_PRIX)
@@ -373,21 +378,21 @@ void RaceManager::startNew(bool from_overworld)
     // Create the kart status data structure to keep track of scores, times, ...
     // ==========================================================================
     m_kart_status.clear();
-    if (gk > 0)
-        m_num_karts += gk;
+    if (m_num_ghost_karts > 0)
+        m_num_karts += m_num_ghost_karts;
 
     Log::verbose("RaceManager", "Nb of karts=%u, ghost karts:%u ai:%lu players:%lu\n",
-        (unsigned int) m_num_karts, gk, m_ai_kart_list.size(), m_player_karts.size());
+        (unsigned int) m_num_karts, m_num_ghost_karts, m_ai_kart_list.size(), m_player_karts.size());
 
-    assert((unsigned int)m_num_karts == gk+m_ai_kart_list.size()+m_player_karts.size());
+    assert((unsigned int)m_num_karts == m_num_ghost_karts+m_ai_kart_list.size()+m_player_karts.size());
 
     // First add the ghost karts (if any)
     // ----------------------------------------
     // GP ranks start with -1 for the leader.
     int init_gp_rank = getMinorMode()==MINOR_MODE_FOLLOW_LEADER ? -1 : 0;
-    if (gk > 0)
+    if (m_num_ghost_karts > 0)
     {
-        for(unsigned int i = 0; i < gk; i++)
+        for(unsigned int i = 0; i < m_num_ghost_karts; i++)
         {
             m_kart_status.push_back(KartStatus(ReplayPlay::get()->getGhostKartName(i),
                 i, -1, -1, init_gp_rank, KT_GHOST, PLAYER_DIFFICULTY_NORMAL));
@@ -506,6 +511,31 @@ void RaceManager::startNextRace()
         }
     }   // not first race
 
+    // set boosted AI status for AI karts
+    int boosted_ai_count = std::min<int>((int)m_ai_kart_list.size(),
+                                         ((int)(m_kart_status.size())-2)/4 + 1);
+    if (boosted_ai_count > 4) boosted_ai_count = 4;
+    int ai_count = (int)m_ai_kart_list.size();
+
+    for (unsigned int i=0;i<m_kart_status.size();i++)
+    {
+        if (m_kart_status[i].m_kart_type == KT_AI)
+        {
+            if (boosted_ai_count > 0 &&
+                (UserConfigParams::m_gp_most_points_first ||
+                ai_count == boosted_ai_count))
+            {
+                m_kart_status[i].m_boosted_ai = true;
+                boosted_ai_count--;
+            }
+            else
+            {
+                m_kart_status[i].m_boosted_ai = false;
+            }
+            ai_count--;
+        }
+    }
+
     // the constructor assigns this object to the global
     // variable world. Admittedly a bit ugly, but simplifies
     // handling of objects which get created in the constructor
@@ -521,8 +551,15 @@ void RaceManager::startNextRace()
         World::setWorld(new StandardRace());
     else if(m_minor_mode==MINOR_MODE_TUTORIAL)
         World::setWorld(new TutorialWorld());
-    else if(m_minor_mode==MINOR_MODE_3_STRIKES)
-        World::setWorld(new ThreeStrikesBattle());
+    else if(m_minor_mode==MINOR_MODE_BATTLE)
+    {
+        if (m_major_mode == MAJOR_MODE_3_STRIKES)
+            World::setWorld(new ThreeStrikesBattle());
+        else if (m_major_mode == MAJOR_MODE_FREE_FOR_ALL)
+            World::setWorld(new FreeForAll());
+        else if (m_major_mode == MAJOR_MODE_CAPTURE_THE_FLAG)
+            World::setWorld(new CaptureTheFlag());
+    }
     else if(m_minor_mode==MINOR_MODE_SOCCER)
         World::setWorld(new SoccerWorld());
     else if(m_minor_mode==MINOR_MODE_OVERWORLD)
@@ -745,6 +782,7 @@ void RaceManager::exitRace(bool delete_world)
         }
         StateManager::get()->resetAndGoToScreen( MainMenuScreen::getInstance() );
 
+        bool some_human_player_well_ranked = false;
         bool some_human_player_won = false;
         const unsigned int kart_status_count = (unsigned int)m_kart_status.size();
 
@@ -768,7 +806,9 @@ void RaceManager::exitRace(bool delete_world)
                 if (m_kart_status[i].m_kart_type == KT_PLAYER ||
                     m_kart_status[i].m_kart_type == KT_NETWORK_PLAYER)
                 {
-                    some_human_player_won = true;
+                    some_human_player_well_ranked = true;
+                    if (rank == 0)
+                        some_human_player_won = true;
                 }
             }
             else if (rank >= loserThreshold)
@@ -793,13 +833,14 @@ void RaceManager::exitRace(bool delete_world)
         race_manager->setNumKarts(0);
         race_manager->setNumPlayers(0);
 
-        if (some_human_player_won)
+        if (some_human_player_well_ranked)
         {
             race_manager->startSingleRace("gpwin", 999,
                                   race_manager->raceWasStartedFromOverworld());
             GrandPrixWin* scene = GrandPrixWin::getInstance();
             scene->push();
             scene->setKarts(winners);
+            scene->setPlayerWon(some_human_player_won);
         }
         else
         {
@@ -882,7 +923,7 @@ void RaceManager::rerunRace()
         m_kart_status[i].m_score         = m_kart_status[i].m_last_score;
         m_kart_status[i].m_overall_time -= m_kart_status[i].m_last_time;
     }
-    World::getWorld()->reset();
+    World::getWorld()->reset(true /* restart */);
 }   // rerunRace
 
 //-----------------------------------------------------------------------------
@@ -918,7 +959,8 @@ void RaceManager::startSingleRace(const std::string &track_ident,
 
     if (num_laps != -1) setNumLaps( num_laps );
 
-    setMajorMode(RaceManager::MAJOR_MODE_SINGLE);
+    if (m_minor_mode != MINOR_MODE_BATTLE)
+        setMajorMode(RaceManager::MAJOR_MODE_SINGLE);
 
     setCoinTarget( 0 ); // Might still be set from a previous challenge
 
@@ -985,7 +1027,7 @@ void RaceManager::configGrandPrixResultFromNetwork(NetworkString& ns)
             { return m_tracks; }
         virtual unsigned int
             getNumberOfTracks(const bool includeLocked=false) const
-            { return m_tracks.size(); }
+            { return (unsigned int)m_tracks.size(); }
         void addNetworkTrack(const std::string& t) { m_tracks.push_back(t); }
     };
 

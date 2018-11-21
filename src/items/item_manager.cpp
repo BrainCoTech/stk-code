@@ -26,13 +26,13 @@
 #include "karts/abstract_kart.hpp"
 #include "karts/controller/spare_tire_ai.hpp"
 #include "modes/easter_egg_hunt.hpp"
+#include "modes/profile_world.hpp"
 #include "network/network_config.hpp"
 #include "network/race_event_manager.hpp"
 #include "physics/triangle_mesh.hpp"
 #include "tracks/arena_graph.hpp"
 #include "tracks/arena_node.hpp"
 #include "tracks/track.hpp"
-#include "utils/random_generator.hpp"
 #include "utils/string_utils.hpp"
 
 #include <IMesh.h>
@@ -44,19 +44,20 @@
 #include <string>
 
 
-std::vector<scene::IMesh *> ItemManager::m_item_mesh;
-std::vector<scene::IMesh *> ItemManager::m_item_lowres_mesh;
-std::vector<video::SColorf> ItemManager::m_glow_color;
-bool                        ItemManager::m_disable_item_collection = false;
-ItemManager *               ItemManager::m_item_manager = NULL;
-
+std::vector<scene::IMesh *>  ItemManager::m_item_mesh;
+std::vector<scene::IMesh *>  ItemManager::m_item_lowres_mesh;
+std::vector<video::SColorf>  ItemManager::m_glow_color;
+bool                         ItemManager::m_disable_item_collection = false;
+std::shared_ptr<ItemManager> ItemManager::m_item_manager;
+std::mt19937                 ItemManager::m_random_engine;
 
 //-----------------------------------------------------------------------------
 /** Creates one instance of the item manager. */
 void ItemManager::create()
 {
     assert(!m_item_manager);
-    m_item_manager = new ItemManager();
+    // Due to protected constructor use new instead of make_shared
+    m_item_manager = std::shared_ptr<ItemManager>(new ItemManager());
 }   // create
 
 //-----------------------------------------------------------------------------
@@ -64,8 +65,7 @@ void ItemManager::create()
 void ItemManager::destroy()
 {
     assert(m_item_manager);
-    delete m_item_manager;
-    m_item_manager = NULL;
+    m_item_manager = nullptr;
 }   // destroy
 
 //-----------------------------------------------------------------------------
@@ -192,9 +192,8 @@ ItemManager::ItemManager()
 void ItemManager::setSwitchItems(const std::vector<int> &switch_items)
 {
     for(unsigned int i=ItemState::ITEM_FIRST; i<ItemState::ITEM_COUNT; i++)
-        m_switch_to[i]=(ItemState::ItemType)stk_config->m_switch_items[i];
+        m_switch_to[i]=(ItemState::ItemType)switch_items[i];
 }   // setSwitchItems
-
 
 //-----------------------------------------------------------------------------
 /** Destructor. Cleans up all items and meshes stored.
@@ -226,13 +225,15 @@ unsigned int ItemManager::insertItem(Item *item)
     // previously deleted entry, otherwise at the end.
     int index = -1;
     for(index=(int)m_all_items.size()-1; index>=0 && m_all_items[index]; index--) {}
-
-    if(index==-1) index = (int)m_all_items.size();
-
-    if(index<(int)m_all_items.size())
-        m_all_items[index] = item;
-    else
+    if (index == -1)
+    {
+        index = (int)m_all_items.size();
         m_all_items.push_back(item);
+    }
+    else
+    {
+        m_all_items[index] = item;
+    }
     item->setItemId(index);
 
     // Now insert into the appropriate quad list, if there is a quad list
@@ -256,28 +257,45 @@ unsigned int ItemManager::insertItem(Item *item)
  *  bubblegum).
  *  \param type Type of the item.
  *  \param kart The kart that drops the new item.
- *  \param xyz Can be used to overwrite the item location (used in networking).
+ *  \param server_xyz Can be used to overwrite the item location.
+ *  \param server_normal The normal as seen on the server.
  */
 Item* ItemManager::dropNewItem(ItemState::ItemType type,
-                               const AbstractKart *kart, const Vec3 *xyz)
+                               const AbstractKart *kart, 
+                               const Vec3 *server_xyz,
+                               const Vec3 *server_normal)
 {
-    Vec3 hit_point;
-    Vec3 normal;
+    if (NetworkConfig::get()->isNetworking() &&
+        NetworkConfig::get()->isClient() && !server_xyz) return NULL;
+    Vec3 normal, pos;
     const Material* material_hit;
-    Vec3 pos = xyz ? *xyz : kart->getXYZ();
-    Vec3 to = pos + kart->getTrans().getBasis() * Vec3(0, -10000, 0);
-    Track::getCurrentTrack()->getTriangleMesh().castRay(pos, to,
-                                                        &hit_point,
-                                                        &material_hit,
-                                                        &normal);
-    // This can happen if the kart is 'over nothing' when dropping
-    // the bubble gum
-    if (!material_hit) return NULL;
+    if (!server_xyz)
+    {
+        // We are doing a new drop locally, i.e. not based on
+        // server data. So we need a raycast to find the correct
+        // location and normal of the item:
+        pos = server_xyz ? *server_xyz : kart->getXYZ();
+        Vec3 to = pos + kart->getTrans().getBasis() * Vec3(0, -10000, 0);
+        Vec3 hit_point;
+        Track::getCurrentTrack()->getTriangleMesh().castRay(pos, to,
+                                                            &hit_point,
+                                                            &material_hit,
+                                                            &normal);
 
-    normal.normalize();
-
-    pos = hit_point + kart->getTrans().getBasis() * Vec3(0, -0.05f, 0);
-
+        // We will get no material if the kart is 'over nothing' when dropping
+        // the bubble gum. In most cases this means that the item does not need
+        // to be created (and we just return NULL). 
+        if (!material_hit) return NULL;
+        normal.normalize();
+        pos = hit_point + kart->getTrans().getBasis() * Vec3(0, -0.05f, 0);
+    }
+    else
+    {
+        // We are on a client which has received a new item event from the
+        // server. So use the server's data for the new item:
+        normal = *server_normal;
+        pos    = *server_xyz;
+    }
 
     ItemState::ItemType mesh_type = type;
     if (type == ItemState::ITEM_BUBBLEGUM && kart->getIdent() == "nolok")
@@ -286,15 +304,12 @@ Item* ItemManager::dropNewItem(ItemState::ItemType type,
     }
 
     Item* item = new Item(type, pos, normal, m_item_mesh[mesh_type],
-                          m_item_lowres_mesh[mesh_type]);
-
-    if(kart != NULL) item->setParent(kart);
+                          m_item_lowres_mesh[mesh_type], /*prev_owner*/kart);
     insertItem(item);
     if(m_switch_ticks>=0)
     {
         ItemState::ItemType new_type = m_switch_to[item->getType()];
-        item->switchTo(new_type, m_item_mesh[(int)new_type],
-                       m_item_lowres_mesh[(int)new_type]);
+        item->switchTo(new_type);
     }
     return item;
 }   // dropNewItem
@@ -313,18 +328,18 @@ Item* ItemManager::placeItem(ItemState::ItemType type, const Vec3& xyz,
     // Make sure this subroutine is not used otherwise (since networking
     // needs to be aware of items added to the track, so this would need
     // to be added).
-    assert(World::getWorld()->getPhase() == WorldStatus::SETUP_PHASE);
+    assert(World::getWorld()->getPhase() == WorldStatus::SETUP_PHASE ||
+           ProfileWorld::isProfileMode()                               );
     ItemState::ItemType mesh_type = type;
 
     Item* item = new Item(type, xyz, normal, m_item_mesh[mesh_type],
-                          m_item_lowres_mesh[mesh_type]);
+                          m_item_lowres_mesh[mesh_type], /*prev_owner*/NULL);
 
     insertItem(item);
     if (m_switch_ticks >= 0)
     {
         ItemState::ItemType new_type = m_switch_to[item->getType()];
-        item->switchTo(new_type, m_item_mesh[(int)new_type],
-                       m_item_lowres_mesh[(int)new_type]);
+        item->switchTo(new_type);
     }
     return item;
 }   // placeItem
@@ -353,17 +368,9 @@ Item* ItemManager::placeTrigger(const Vec3& xyz, float distance,
  *  \param item The item that was collected.
  *  \param kart The kart that collected the item.
  */
-void ItemManager::collectedItem(Item *item, AbstractKart *kart)
+void ItemManager::collectedItem(ItemState *item, AbstractKart *kart)
 {
     assert(item);
-    // Spare tire karts don't collect items
-    if (dynamic_cast<SpareTireAI*>(kart->getController()) != NULL) return;
-    if( (item->getType() == ItemState::ITEM_BUBBLEGUM ||
-         item->getType() == ItemState::ITEM_BUBBLEGUM_NOLOK) && kart->isShielded())
-    {
-        // shielded karts can simply drive over bubble gums without any effect.
-        return;
-    }
     item->collected(kart);
     // Inform the world - used for Easter egg hunt
     World::getWorld()->collectedItem(kart, item);
@@ -389,10 +396,23 @@ void  ItemManager::checkItemHit(AbstractKart* kart)
     /** Disable item collection detection for debug purposes. */
     if(m_disable_item_collection) return;
 
+    // Spare tire karts don't collect items
+    if ( dynamic_cast<SpareTireAI*>(kart->getController()) ) return;
+
     for(AllItemTypes::iterator i =m_all_items.begin();
                                i!=m_all_items.end();  i++)
     {
-        if((!*i) || !(*i)->isAvailable()) continue;
+        // Ignore items that have been collected or are not available atm
+        if ((!*i) || !(*i)->isAvailable() || (*i)->isUsedUp()) continue;
+
+        // Shielded karts can simply drive over bubble gums without any effect
+        if ( kart->isShielded() &&
+             ( (*i)->getType() == ItemState::ITEM_BUBBLEGUM      ||
+               (*i)->getType() == ItemState::ITEM_BUBBLEGUM_NOLOK  ) )
+        {
+            continue;
+        }
+
 
         // To allow inlining and avoid including kart.hpp in item.hpp,
         // we pass the kart and the position separately.
@@ -460,8 +480,8 @@ void ItemManager::update(int ticks)
         m_switch_ticks -= ticks;
         if(m_switch_ticks<0)
         {
-            for(AllItemTypes::iterator i =m_all_items.begin();
-                i!=m_all_items.end();  i++)
+            for(AllItemTypes::iterator i = m_all_items.begin();
+                                       i!= m_all_items.end();  i++)
             {
                 if(*i) (*i)->switchBack();
             }   // for m_all_items
@@ -501,7 +521,7 @@ void ItemManager::updateGraphics(float dt)
  *  items, and then frees the item itself.
  *  \param The item to delete.
  */
-void ItemManager::deleteItem(Item *item)
+void ItemManager::deleteItem(ItemState *item)
 {
     // First check if the item needs to be removed from the items-in-quad list
     if(m_items_in_quads)
@@ -523,12 +543,21 @@ void ItemManager::deleteItem(Item *item)
 
 //-----------------------------------------------------------------------------
 /** Switches all items: boxes become bananas and vice versa for a certain
- *  amount of time (as defined in stk_config.xml.
+ *  amount of time (as defined in stk_config.xml).
  */
 void ItemManager::switchItems()
 {
-    for(AllItemTypes::iterator i =m_all_items.begin();
-        i!=m_all_items.end();  i++)
+    switchItemsInternal(m_all_items);
+}  // switchItems
+
+//-----------------------------------------------------------------------------
+/** Switches all items: boxes become bananas and vice versa for a certain
+ *  amount of time (as defined in stk_config.xml).
+ */
+void ItemManager::switchItemsInternal(std::vector<ItemState*> &all_items)
+{
+    for(AllItemTypes::iterator i  = all_items.begin();
+                               i != all_items.end();  i++)
     {
         if(!*i) continue;
 
@@ -546,10 +575,10 @@ void ItemManager::switchItems()
         if (new_type == (*i)->getType())
             continue;
         if(m_switch_ticks<0)
-            (*i)->switchTo(new_type, m_item_mesh[(int)new_type], m_item_lowres_mesh[(int)new_type]);
+            (*i)->switchTo(new_type);
         else
             (*i)->switchBack();
-    }   // for m_all_items
+    }   // for all_items
 
     // if the items are already switched (m_switch_ticks >=0)
     // then switch back, and set m_switch_ticks to -1 to indicate
@@ -577,11 +606,11 @@ bool ItemManager::randomItemsForArena(const AlignedArray<btTransform>& pos)
         invalid_location.push_back(node);
     }
 
-    RandomGenerator random;
     const unsigned int ALL_NODES = ag->getNumNodes();
     const unsigned int MIN_DIST = int(sqrt(ALL_NODES));
     const unsigned int TOTAL_ITEM = MIN_DIST / 2;
 
+    std::vector<uint32_t> random_numbers;
     Log::info("[ItemManager]","Creating %d random items for arena", TOTAL_ITEM);
     for (unsigned int i = 0; i < TOTAL_ITEM; i++)
     {
@@ -595,8 +624,9 @@ bool ItemManager::randomItemsForArena(const AlignedArray<btTransform>& pos)
                     "Use default item location.");
                 return false;
             }
-
-            const int node = random.get(ALL_NODES);
+            uint32_t number = m_random_engine();
+            Log::debug("[ItemManager]", "%u from random engine.", number);
+            const int node = number % ALL_NODES;
 
             // Check if tried
             std::vector<int>::iterator it = std::find(invalid_location.begin(),
@@ -622,6 +652,7 @@ bool ItemManager::randomItemsForArena(const AlignedArray<btTransform>& pos)
             {
                 chosen_node = node;
                 invalid_location.push_back(node);
+                random_numbers.push_back(number);
                 break;
             }
             else
@@ -635,7 +666,8 @@ bool ItemManager::randomItemsForArena(const AlignedArray<btTransform>& pos)
     for (unsigned int i = 0; i < pos.size(); i++)
         used_location.erase(used_location.begin());
 
-    assert (used_location.size() == TOTAL_ITEM);
+    assert(used_location.size() == TOTAL_ITEM);
+    assert(random_numbers.size() == TOTAL_ITEM);
 
     // Hard-coded ratio for now
     const int BONUS_BOX = 4;
@@ -644,7 +676,7 @@ bool ItemManager::randomItemsForArena(const AlignedArray<btTransform>& pos)
 
     for (unsigned int i = 0; i < TOTAL_ITEM; i++)
     {
-        const int j = random.get(10);
+        const unsigned j = random_numbers[i] % 10;
         ItemState::ItemType type = (j > BONUS_BOX ? ItemState::ITEM_BONUS_BOX :
             j > NITRO_BIG ? ItemState::ITEM_NITRO_BIG :
             j > NITRO_SMALL ? ItemState::ITEM_NITRO_SMALL : ItemState::ITEM_BANANA);

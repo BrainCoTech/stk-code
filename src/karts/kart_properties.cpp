@@ -82,7 +82,7 @@ KartProperties::KartProperties(const std::string &filename)
     // Set all other values to undefined, so that it can later be tested
     // if everything is defined properly.
     m_wheel_base = m_friction_slip = m_collision_terrain_impulse =
-        m_collision_impulse = m_restitution = m_collision_impulse_time =
+        m_collision_impulse = m_collision_impulse_time =
         m_max_lean = m_lean_speed = m_physical_wheel_position = UNDEFINED;
 
     m_terrain_impulse_type       = IMPULSE_NONE;
@@ -92,7 +92,7 @@ KartProperties::KartProperties(const std::string &filename)
     m_color                      = video::SColor(255, 0, 0, 0);
     m_shape                      = 32;  // close enough to a circle.
     m_engine_sfx_type            = "engine_small";
-    m_nitro_min_consumption      = 0.53f;
+    m_nitro_min_consumption      = 64;
     // The default constructor for stk_config uses filename=""
     if (filename != "")
     {
@@ -303,17 +303,12 @@ void KartProperties::load(const std::string &filename, const std::string &node)
         m_gravity_center_shift.setZ(0);
     }
 
-    // In older STK versions the physical wheels where moved 'wheel_radius'
-    // into the physical body (i.e. 'hypothetical' wheel shape would not
-    // poke out of the physical shape). In order to make the karts a bit more
-    // stable, the physical wheel position (i.e. location of raycast) were
-    // moved to be on the corner of the shape. In order to retain the same
-    // steering behaviour, the wheel base (which in turn determines the
-    // turn angle at certain speeds) is shortened by 2*wheel_radius
-    // Wheel radius was always 0.25, and is now not used anymore, but in order
-    // to keep existing steering behaviour, the same formula is still
-    // used.
-    m_wheel_base = fabsf(m_kart_model->getLength() - 2*0.25f);
+    // The longer the kart,the bigger its turn radius if using an identical
+    // wheel base, exactly proportionally to its length.
+    // The wheel base is used to compensate this
+    // We divide by 1.425 to have a default turn radius which conforms
+    // closely (+-0,1%) with the specifications in kart_characteristics.xml
+    m_wheel_base = fabsf(m_kart_model->getLength()/1.425f);
 
     m_shadow_material = material_manager->getMaterialSPM(m_shadow_file, "",
         "alphablend");
@@ -355,13 +350,10 @@ void KartProperties::combineCharacteristics(PerPlayerDifficulty difficulty)
 
     // Try to get the kart type
     const AbstractCharacteristic *characteristic = kart_properties_manager->
-        getKartTypeCharacteristic(m_kart_type);
-    if (!characteristic)
-        Log::warn("KartProperties", "Can't find kart type '%s' for kart '%s'",
-            m_kart_type.c_str(), m_name.c_str());
-    else
-        // Kart type found
-        m_combined_characteristic->addCharacteristic(characteristic);
+        getKartTypeCharacteristic(m_kart_type, m_name);
+
+    // Combine kart type
+    m_combined_characteristic->addCharacteristic(characteristic);
 
     m_combined_characteristic->addCharacteristic(kart_properties_manager->
         getPlayerCharacteristic(getPerPlayerDifficultyAsString(difficulty)));
@@ -499,7 +491,7 @@ void KartProperties::getAllData(const XMLNode * root)
 void KartProperties::checkAllSet(const std::string &filename)
 {
 #define CHECK_NEG(  a,strA) if(a<=UNDEFINED) {                      \
-        Log::fatal("[KartProperties]",                                \
+        Log::fatal("KartProperties",                                \
                     "Missing default value for '%s' in '%s'.",    \
                     strA,filename.c_str());                \
     }
@@ -508,8 +500,10 @@ void KartProperties::checkAllSet(const std::string &filename)
     CHECK_NEG(m_collision_terrain_impulse,  "collision terrain-impulse"     );
     CHECK_NEG(m_collision_impulse,          "collision impulse"             );
     CHECK_NEG(m_collision_impulse_time,     "collision impulse-time"        );
-    CHECK_NEG(m_restitution,                "collision restitution"         );
     CHECK_NEG(m_physical_wheel_position,    "collision physical-wheel-position");
+
+    if(m_restitution.size()<1)
+        Log::fatal("KartProperties", "Missing restitution value.");
 
     for(unsigned int i=0; i<RaceManager::DIFFICULTY_COUNT; i++)
         m_ai_properties[i]->checkAllSet(filename);
@@ -550,15 +544,32 @@ bool KartProperties::isInGroup(const std::string &group) const
 }   // isInGroups
 
 // ----------------------------------------------------------------------------
-float KartProperties::getAvgPower() const
+/** This function returns a weighted average of engine power divide by mass
+ *  for use as a single number summing-up acceleration's efficiency,
+ *  e.g. for use in kart selection. */
+float KartProperties::getAccelerationEfficiency() const
 {
-    float sum = 0;
     std::vector<float> gear_power_increase = m_combined_characteristic->getGearPowerIncrease();
-    float power = m_combined_characteristic->getEnginePower();
-    for (unsigned int i = 0; i < gear_power_increase.size(); ++i)
-        sum += gear_power_increase[i] * power;
-    return sum / gear_power_increase.size();
-}   // getAvgPower
+    std::vector<float> gear_switch_ratio = m_combined_characteristic->getGearSwitchRatio();
+    unsigned current_gear = 0;
+    float sum = 0;
+    float base_accel = m_combined_characteristic->getEnginePower()
+                     / m_combined_characteristic->getMass();
+
+    // We evaluate acceleration at increments of 0.01x max speed
+    // up to 1,1x max speed.
+    // Acceleration at low speeds is made to matter more
+    for (unsigned int i = 1; i<=110; i++)
+    {
+        sum += gear_power_increase[current_gear] * base_accel * (150-i);
+        if (i/100 >= gear_switch_ratio[current_gear] &&
+            (current_gear+1 < gear_power_increase.size() ))
+            current_gear++;
+    }
+
+    // 10395 is the sum of the (150-i) factors
+    return (sum / 10395);
+}   // getAccelerationEfficiency
 
 // ----------------------------------------------------------------------------
 // Script-generated content generated by tools/create_kart_properties.py getter
@@ -1001,19 +1012,16 @@ float KartProperties::getNitroDuration() const
 }  // getNitroDuration
 
 // ------------------------------------------------------------------------
-/** Returns minimum time during which nitro is consumed when pressing nitro
- *  key, to prevent using nitro in very short bursts
-  */
-int KartProperties::getNitroMinConsumptionTicks() const
-{
-    return stk_config->time2Ticks(m_nitro_min_consumption);
-}
-
-// ----------------------------------------------------------------------------
 float KartProperties::getNitroEngineForce() const
 {
     return m_cached_characteristic->getNitroEngineForce();
 }  // getNitroEngineForce
+
+// ----------------------------------------------------------------------------
+float KartProperties::getNitroEngineMult() const
+{
+    return m_cached_characteristic->getNitroEngineMult();
+}  // getNitroEngineMult
 
 // ----------------------------------------------------------------------------
 float KartProperties::getNitroConsumption() const
@@ -1227,3 +1235,4 @@ bool KartProperties::getSkidEnabled() const
 }  // getSkidEnabled
 
 /* <characteristics-end kpgetter> */
+

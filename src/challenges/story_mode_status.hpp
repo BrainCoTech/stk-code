@@ -78,7 +78,7 @@ public:
      StoryModeStatus(const XMLNode *node=NULL);
     ~StoryModeStatus();
 
-    void computeActive();
+    void       computeActive     (bool first_call=false);
     bool       isLocked          (const std::string& feature);
     void       unlockFeatureByList();
     void       lockFeature       (ChallengeStatus *challenge);
@@ -98,6 +98,13 @@ public:
     // ------------------------------------------------------------------------
     /** Clear the list of recently unlocked challenges */
     void       clearUnlocked     () {m_unlocked_features.clear(); }
+    // ------------------------------------------------------------------------
+    /** Returns the number of completed challenges. */
+    int        getNumCompletedChallenges  () const { return (m_easy_challenges + m_medium_challenges +
+                                                             m_hard_challenges + m_best_challenges); }
+    // ------------------------------------------------------------------------
+    /** Returns the number of challenges with the superTux time beaten in a lower difficulty. */
+    int        getNumReqMetInLowerDiff  () const;
     // ------------------------------------------------------------------------
     /** Returns the number of points accumulated. */
     int        getPoints          () const { return m_points; }

@@ -45,6 +45,8 @@ private:
     int   m_eggs_found;
 
     bool  m_only_ghosts;
+
+    float m_finish_time;
 public:
              EasterEggHunt();
     virtual ~EasterEggHunt();
@@ -54,7 +56,7 @@ public:
     virtual bool isRaceOver() OVERRIDE;
 
     // overriding World methods
-    virtual void reset() OVERRIDE;
+    virtual void reset(bool restart=false) OVERRIDE;
 
     virtual bool raceHasLaps() OVERRIDE { return false; }
 
@@ -64,7 +66,7 @@ public:
     virtual void getKartsDisplayInfo(
                  std::vector<RaceGUIBase::KartIconDisplayInfo> *info) OVERRIDE;
     virtual void collectedItem(const AbstractKart *kart,
-                               const Item *item           ) OVERRIDE;
+                               const ItemState *item     ) OVERRIDE;
     void collectedEasterEggGhost(int world_id);
 
     const int  numberOfEggsFound() { return m_eggs_found; }

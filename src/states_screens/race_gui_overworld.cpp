@@ -81,10 +81,10 @@ RaceGUIOverworld::RaceGUIOverworld()
     m_is_first_render_call = true;
     m_close_to_a_challenge = false;
     m_current_challenge = NULL;
-    m_trophy1 = irr_driver->getTexture(FileManager::GUI, "cup_bronze.png");
-    m_trophy2 = irr_driver->getTexture(FileManager::GUI, "cup_silver.png");
-    m_trophy3 = irr_driver->getTexture(FileManager::GUI, "cup_gold.png"  );
-    m_trophy4 = irr_driver->getTexture(FileManager::GUI, "cup_platinum.png"  );
+    m_trophy[0] = irr_driver->getTexture(FileManager::GUI_ICON, "cup_bronze.png");
+    m_trophy[1] = irr_driver->getTexture(FileManager::GUI_ICON, "cup_silver.png");
+    m_trophy[2] = irr_driver->getTexture(FileManager::GUI_ICON, "cup_gold.png"  );
+    m_trophy[3] = irr_driver->getTexture(FileManager::GUI_ICON, "cup_platinum.png"  );
 
     float scaling = irr_driver->getFrameSize().Height / 420.0f;
     const float map_size = 250.0f;
@@ -99,7 +99,8 @@ RaceGUIOverworld::RaceGUIOverworld()
     // Check if we have enough space for minimap when touch steering is enabled
     if (m_multitouch_gui != NULL)
     {
-        const float map_bottom = (float)(m_multitouch_gui->getMinimapBottom());
+        const float map_bottom = (float)(irr_driver->getActualScreenSize().Height - 
+                                         m_multitouch_gui->getHeight());
         
         if ((map_size + 20.0f) * scaling > map_bottom)
         {
@@ -153,16 +154,16 @@ RaceGUIOverworld::RaceGUIOverworld()
     gui::ScalableFont* font = GUIEngine::getFont();
     m_trophy_points_width = font->getDimension(L"1000").Width;
 
-    m_lock           = irr_driver->getTexture(FileManager::GUI,"gui_lock.png");
-    m_open_challenge = irr_driver->getTexture(FileManager::GUI,"challenge.png");
-    m_locked_bonus   = irr_driver->getTexture(FileManager::GUI,"mystery_unlock.png");
+    m_lock           = irr_driver->getTexture(FileManager::GUI_ICON,"gui_lock.png");
+    m_open_challenge = irr_driver->getTexture(FileManager::GUI_ICON,"challenge.png");
+    m_locked_bonus   = irr_driver->getTexture(FileManager::GUI_ICON,"mystery_unlock.png");
 
     m_icons[0] = m_lock;
     m_icons[1] = m_open_challenge;
-    m_icons[2] = m_trophy1;
-    m_icons[3] = m_trophy2;
-    m_icons[4] = m_trophy3;
-    m_icons[5] = m_trophy4;
+    m_icons[2] = m_trophy[0];
+    m_icons[3] = m_trophy[1];
+    m_icons[4] = m_trophy[2];
+    m_icons[5] = m_trophy[3];
     m_icons[6] = m_locked_bonus;
 }   // RaceGUIOverworld
 
@@ -189,10 +190,6 @@ void RaceGUIOverworld::renderGlobal(float dt)
     if (race_manager->getIfEmptyScreenSpaceExists() &&
         !GUIEngine::ModalDialog::isADialogActive())
     {
-        const float sqrt_num_players =
-            sqrtf((float)race_manager->getNumLocalPlayers());
-        const int rows = (int)ceil(sqrt_num_players);
-        const int cols = (int)round(sqrt_num_players);
         static video::SColor black = video::SColor(255,0,0,0);
         GL32_draw2DRectangle(black, irr_driver->getSplitscreenWindow(
             race_manager->getNumLocalPlayers()));
@@ -277,71 +274,37 @@ void RaceGUIOverworld::drawTrophyPoints()
     core::rect<s32> pos(irr_driver->getActualScreenSize().Width - dist_from_right, 10,
                         irr_driver->getActualScreenSize().Width                  , 50);
 
-    gui::ScalableFont* font = GUIEngine::getFont();
+    gui::ScalableFont* font = GUIEngine::getHighresDigitFont();
 
     bool vcenter = true;
 
     const int size = irr_driver->getActualScreenSize().Width/20;
     core::rect<s32> dest(size, pos.UpperLeftCorner.Y,
                          size*2, pos.UpperLeftCorner.Y + size);
-    core::rect<s32> source(core::position2di(0, 0), m_trophy4->getSize());
+    core::rect<s32> source(core::position2di(0, 0), m_trophy[3]->getSize());
 
-    font->setShadow(video::SColor(255,0,0,0));
+    // Draw trophies icon and the number of trophy obtained by type
+    for (unsigned int i=0;i<4;i++)
+    {
+        if (m_close_to_a_challenge)
+            break;
 
-    if (!m_close_to_a_challenge)
-    {
-        draw2DImage(m_trophy1, dest, source, NULL,
-                                                  NULL, true /* alpha */);
-    }
+        if (i==3 && PlayerManager::getCurrentPlayer()->isLocked("difficulty_best"))
+            break;
 
-    dest += core::position2di((int)(size*1.5f), 0);
-    std::string easyTrophies = StringUtils::toString(player->getNumEasyTrophies());
-    core::stringw easyTrophiesW(easyTrophies.c_str());
-    if (!m_close_to_a_challenge)
-    {
-        font->draw(easyTrophiesW.c_str(), dest, time_color, false, vcenter, NULL, true /* ignore RTL */);
-    }
+        draw2DImage(m_trophy[i], dest, source, NULL, NULL, true /* alpha */);
 
-    dest += core::position2di(size*2, 0);
-    if (!m_close_to_a_challenge)
-    {
-        draw2DImage(m_trophy2, dest, source, NULL,
-                                                  NULL, true /* alpha */);
-    }
+        dest += core::position2di((int)(size*1.5f), 0);
+        std::string trophies = (i==0) ? StringUtils::toString(player->getNumEasyTrophies())   :
+                               (i==1) ? StringUtils::toString(player->getNumMediumTrophies()) :
+                               (i==2) ? StringUtils::toString(player->getNumHardTrophies())   :
+                                        StringUtils::toString(player->getNumBestTrophies());
+        core::stringw trophiesW(trophies.c_str());
+        font->setBlackBorder(true);
+        font->draw(trophiesW.c_str(), dest, time_color, false, vcenter, NULL, true /* ignore RTL */);
+        font->setBlackBorder(false);
 
-    dest += core::position2di((int)(size*1.5f), 0);
-    std::string mediumTrophies = StringUtils::toString(player->getNumMediumTrophies());
-    core::stringw mediumTrophiesW(mediumTrophies.c_str());
-    if (!m_close_to_a_challenge)
-    {
-        font->draw(mediumTrophiesW.c_str(), dest, time_color, false, vcenter, NULL, true /* ignore RTL */);
-    }
-
-    dest += core::position2di(size*2, 0);
-    if (!m_close_to_a_challenge)
-    {
-        draw2DImage(m_trophy3, dest, source, NULL,
-                                                  NULL, true /* alpha */);
-    }
-    dest += core::position2di((int)(size*1.5f), 0);
-    std::string hardTrophies = StringUtils::toString(player->getNumHardTrophies());
-    core::stringw hardTrophiesW(hardTrophies.c_str());
-    if (!m_close_to_a_challenge)
-    {
-        font->draw(hardTrophiesW.c_str(), dest, time_color, false, vcenter, NULL, true /* ignore RTL */);
-    }
-
-    dest += core::position2di(size*2, 0);
-    if (!m_close_to_a_challenge && !PlayerManager::getCurrentPlayer()->isLocked("difficulty_best"))
-    {
-        draw2DImage(m_trophy4, dest, source, NULL, NULL, true /* alpha */);
-    }
-    dest += core::position2di((int)(size*1.5f), 0);
-    std::string bestTrophies = StringUtils::toString(player->getNumBestTrophies());
-    core::stringw bestTrophiesW(bestTrophies.c_str());
-    if (!m_close_to_a_challenge && !PlayerManager::getCurrentPlayer()->isLocked("difficulty_best"))
-    {
-        font->draw(bestTrophiesW.c_str(), dest, time_color, false, vcenter, NULL, true /* ignore RTL */);
+        dest += core::position2di(size*2, 0);
     }
 
     dest = core::rect<s32>(pos.UpperLeftCorner.X - size, pos.UpperLeftCorner.Y,
@@ -363,12 +326,14 @@ void RaceGUIOverworld::drawTrophyPoints()
     else if (points <99) number_width = middle_width;
     else number_width = large_width;
 
-    pos.LowerRightCorner.Y = dest.LowerRightCorner.Y + 1.5f*size;
-    pos.UpperLeftCorner.X -= (0.5f*size + number_width*0.5f);
+    pos.LowerRightCorner.Y = int(dest.LowerRightCorner.Y + 1.5f*size);
+    pos.UpperLeftCorner.X -= int(0.5f*size + number_width*0.5f);
 
+    font->setBlackBorder(true);
     font->draw(sw.c_str(), pos, time_color, false, vcenter, NULL, true /* ignore RTL */);
+    font->setBlackBorder(false);
 
-    pos.UpperLeftCorner.X += (0.5f*size + number_width*0.5f);
+    pos.UpperLeftCorner.X += int(0.5f*size + number_width*0.5f);
 
     if (next_unlock_points > points && (points + 80) >= next_unlock_points)
     {
@@ -376,18 +341,20 @@ void RaceGUIOverworld::drawTrophyPoints()
         else if (next_unlock_points <99) number_width = middle_width;
         else number_width = large_width;
 
-        dest = core::rect<s32>(pos.UpperLeftCorner.X - 2.5f*size, pos.UpperLeftCorner.Y,
-                           pos.UpperLeftCorner.X - 1.5f*size, pos.UpperLeftCorner.Y + size);
+        dest = core::rect<s32>(int(pos.UpperLeftCorner.X - 2.5f*size),
+                               pos.UpperLeftCorner.Y,
+                               int(pos.UpperLeftCorner.X - 1.5f*size),
+                               pos.UpperLeftCorner.Y + size);
 
         draw2DImage(m_locked_bonus, dest, source, NULL,
                                                   NULL, true /* alpha */);
 
-        pos.UpperLeftCorner.X -= (2*size + number_width*0.5f);
+        pos.UpperLeftCorner.X -= int(2*size + number_width*0.5f);
 
+        font->setBlackBorder(true);
         font->draw(swg.c_str(), pos, time_color, false, vcenter, NULL, true /* ignore RTL */);
+        font->setBlackBorder(false);
     }
-
-    font->disableShadow();
 #endif
 }   // drawTrophyPoints
 
@@ -475,7 +442,8 @@ void RaceGUIOverworld::drawGlobalMiniMap()
                                      lower_y   -(int)(draw_at.getY()-marker_half_size));
 
             // Highlight the player icons with some backgorund image.
-            if (kart->getController()->isLocalPlayerController())
+            if (kart->getController()->isLocalPlayerController() &&
+                m_icons_frame != NULL)
             {
                 video::SColor colors[4];
                 for (unsigned int i=0;i<4;i++)
@@ -518,7 +486,7 @@ void RaceGUIOverworld::drawGlobalMiniMap()
 
         int state = (unlocked ? OPEN : LOCKED);
         
-        if (UserConfigParams::m_everything_unlocked)
+        if (UserConfigParams::m_unlock_everything > 0)
             state = OPEN;
 
         const ChallengeStatus* c = PlayerManager::getCurrentPlayer()
@@ -566,7 +534,7 @@ void RaceGUIOverworld::drawGlobalMiniMap()
             const unsigned int val = challenge->getNumTrophies();
             bool unlocked = (PlayerManager::getCurrentPlayer()->getPoints() >= val);
             
-            if (UserConfigParams::m_everything_unlocked)
+            if (UserConfigParams::m_unlock_everything > 0)
                 unlocked = true;
                             
             if (!unlocked)

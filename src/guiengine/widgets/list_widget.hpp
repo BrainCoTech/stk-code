@@ -39,7 +39,7 @@ namespace GUIEngine
     public:
         virtual ~IListWidgetHeaderListener(){}
         
-        virtual void onColumnClicked(int columnId) = 0;
+        virtual void onColumnClicked(int column_id, bool sort_desc, bool sort_default) = 0;
     };
     
     /** \brief A vertical list widget with text entries
@@ -223,6 +223,7 @@ namespace GUIEngine
           */
         void markItemRed(const int id, bool red=true);
         void markItemBlue(const int id, bool blue=true);
+        void emphasisItem(const int id, bool enable=true);
         
         /**
           * \brief Make an item red to mark an error, for instance
@@ -242,10 +243,26 @@ namespace GUIEngine
             markItemBlue( id, blue );
         }
 
+        void emphasisItem(const std::string &internalName, bool enable=true)
+        {
+            const int id = getItemID(internalName);
+            assert(id != -1);
+            emphasisItem(id, enable);
+        }
+
         /** Override callback from Widget */
         virtual EventPropagation transmitEvent(Widget* w,
                                                const std::string& originator,
                                                const int playerID);
+
+        /** \brief implementing method from base class Widget */
+        virtual EventPropagation upPressed(const int playerID);
+        
+        /** \brief implementing method from base class Widget */
+        virtual EventPropagation downPressed(const int playerID);
+
+        /** \brief implement common core parts of upPressed and downPressed */ 
+        EventPropagation moveToNextItem(const bool down);
         
         void setColumnListener(IListWidgetHeaderListener* listener)
         {

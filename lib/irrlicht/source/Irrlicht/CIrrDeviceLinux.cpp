@@ -26,8 +26,11 @@ extern bool GLContextDebugBit;
 #include "CColorConverter.h"
 #include "SIrrCreationParameters.h"
 #include "IGUISpriteBank.h"
+
+#ifdef _IRR_COMPILE_WITH_X11_
 #include <X11/XKBlib.h>
 #include <X11/Xatom.h>
+#endif
 
 #ifdef _IRR_COMPILE_WITH_OPENGL_
 #include <GL/gl.h>
@@ -1545,6 +1548,7 @@ int CIrrDeviceLinux::getNumlockMask(Display* display)
 EKEY_CODE CIrrDeviceLinux::getKeyCode(XEvent &event)
 {
 	int keyCode = 0;
+#ifdef _IRR_COMPILE_WITH_X11_
 	SKeyMap mp;
 	
 	// First check for numpad keys
@@ -1553,7 +1557,7 @@ EKEY_CODE CIrrDeviceLinux::getKeyCode(XEvent &event)
 	{
 		mp.X11Key = XkbKeycodeToKeysym(display, event.xkey.keycode, 0, 1);
 		
-		if (mp.X11Key >=XK_KP_0 && mp.X11Key <= XK_KP_9)
+		if ((mp.X11Key >=XK_KP_0 && mp.X11Key <= XK_KP_9 ) || mp.X11Key == XK_KP_Decimal)
 			is_numpad_key = true;
 	}
 	
@@ -1584,6 +1588,7 @@ EKEY_CODE CIrrDeviceLinux::getKeyCode(XEvent &event)
 		
 		os::Printer::log("EKEY_CODE is 0, fallback keycode", core::stringc(keyCode).c_str(), ELL_INFORMATION);
 	}
+#endif
 	return (EKEY_CODE)keyCode;
 }
 #endif
@@ -2179,6 +2184,8 @@ video::IVideoModeList* CIrrDeviceLinux::getVideoModeList()
 				XRRScreenResources* res = XRRGetScreenResources(display, DefaultRootWindow(display));
 				if (!res)
 					break;
+					
+				const char* output_name = getenv("IRR_VIDEO_OUTPUT");
 				
 				RROutput primary_id = XRRGetOutputPrimary(display, DefaultRootWindow(display));
 		
@@ -2198,8 +2205,18 @@ video::IVideoModeList* CIrrDeviceLinux::getVideoModeList()
 						continue;
 					}
 					
-					if (res->outputs[i] == primary_id ||
-						output_id == 0 || crtc_tmp->x < crtc->x ||
+					bool is_primary = false;
+					
+					if (output_name != NULL)
+					{
+						is_primary = (strcmp(output_name, output_tmp->name) == 0);
+					}
+					else
+					{
+						is_primary = (res->outputs[i] == primary_id);
+					}
+					
+					if (is_primary || output_id == 0 || crtc_tmp->x < crtc->x ||
 						(crtc_tmp->x == crtc->x && crtc_tmp->y < crtc->y))
 					{
 						XRRFreeCrtcInfo(crtc);
@@ -2215,7 +2232,7 @@ video::IVideoModeList* CIrrDeviceLinux::getVideoModeList()
 						XRRFreeOutputInfo(output_tmp);			
 					}
 					
-					if (res->outputs[i] == primary_id)
+					if (is_primary)
 						break;
 				}
 				
@@ -2309,9 +2326,9 @@ Returns the parent window of "window" (i.e. the ancestor of window
 that is a direct child of the root, or window itself if it is a direct child).
 If window is the root window, returns window.
 */
+#ifdef _IRR_COMPILE_WITH_X11_
 bool get_toplevel_parent(Display* display, Window window, Window* tp_window)
 {
-#ifdef _IRR_COMPILE_WITH_X11_
 	Window current_window = window;
 	Window parent;
 	Window root;
@@ -2344,10 +2361,9 @@ bool get_toplevel_parent(Display* display, Window window, Window* tp_window)
 			current_window = parent;
 		}
 	}
-#endif
-
 	return false;
 }
+#endif
 
 
 //! Move window to requested position

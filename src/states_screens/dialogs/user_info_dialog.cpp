@@ -21,8 +21,8 @@
 #include "guiengine/dialog_queue.hpp"
 #include "guiengine/engine.hpp"
 #include "online/online_profile.hpp"
-#include "states_screens/online_profile_achievements.hpp"
-#include "states_screens/online_profile_friends.hpp"
+#include "states_screens/online/online_profile_achievements.hpp"
+#include "states_screens/online/online_profile_friends.hpp"
 #include "states_screens/state_manager.hpp"
 #include "utils/translation.hpp"
 
@@ -124,9 +124,11 @@ void UserInfoDialog::beforeAddingWidgets()
 }   // beforeAddingWidgets
 
 // -----------------------------------------------------------------------------
-UserInfoDialog::~UserInfoDialog()
+void UserInfoDialog::init()
 {
-}   // ~UserInfoDialog
+    m_options_widget->setFocusForPlayer(PLAYER_ID_GAME_MASTER);
+    m_options_widget->select("cancel", PLAYER_ID_GAME_MASTER);
+}   // init
 
 // -----------------------------------------------------------------------------
 /** Sends a friend request to the server. When the request is finished, it

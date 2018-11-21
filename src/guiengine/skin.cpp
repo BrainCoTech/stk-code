@@ -308,7 +308,7 @@ Skin::Skin(IGUISkin* fallback_skin)
         SkinConfig::loadFromFile( skin_name );
     }
 
-    bg_image = NULL;
+    m_bg_image = NULL;
 
     m_fallback_skin = fallback_skin;
     m_fallback_skin->grab();
@@ -336,14 +336,14 @@ void Skin::drawBgImage()
     static core::recti dest;
     static core::recti source_area;
 
-    if(bg_image == NULL)
+    if(m_bg_image == NULL)
     {
         int texture_w, texture_h;
-        bg_image =
+        m_bg_image =
             SkinConfig::m_render_params["background::neutral"].getImage();
-        assert(bg_image != NULL);
-        texture_w = bg_image->getSize().Width;
-        texture_h = bg_image->getSize().Height;
+        assert(m_bg_image != NULL);
+        texture_w = m_bg_image->getSize().Width;
+        texture_h = m_bg_image->getSize().Height;
 
         source_area = core::recti(0, 0, texture_w, texture_h);
 
@@ -367,7 +367,7 @@ void Skin::drawBgImage()
     }
 
     irr_driver->getVideoDriver()->enableMaterial2D();
-    draw2DImage(bg_image, dest, source_area,
+    draw2DImage(m_bg_image, dest, source_area,
                                         /* no clipping */0, /*color*/ 0,
                                         /*alpha*/false);
     irr_driver->getVideoDriver()->enableMaterial2D(false);
@@ -912,19 +912,19 @@ void Skin::drawRibbon(const core::recti &rect, Widget* widget,
 {
 }   // drawRibbon
 
-SColorf GetPlayerColor(int player_id)
+// ----------------------------------------------------------------------------
+SColorf Skin::getPlayerColor(int player_id)
 {
-    
     SColorHSL col = { 0,100,50 };
     col.Hue += (360 / 4) * (player_id % 4);
-    int color_id = player_id % 4;
     SColorf color_rgb = { 0,0,0,1 };
-    
-    
-    col.Saturation = col.Saturation * (1.0f / (floorf(float(player_id / 4)) + 1) );
+
+    col.Saturation = col.Saturation *
+        (1.0f / (floorf(float(player_id / 4)) + 1));
     col.toRGB(color_rgb);
     return color_rgb;
-}
+}   // getPlayerColor
+
 // ----------------------------------------------------------------------------
 /**
   * @param focused whether this element is focus by the master player (whether
@@ -992,6 +992,56 @@ void Skin::drawRibbonChild(const core::recti &rect, Widget* widget,
             // selected tab should be slighlty bigger than others
             if (vertical_flip) rect2.UpperLeftCorner.Y -= 10;
             else               rect2.LowerRightCorner.Y += 10;
+        }
+
+        drawBoxFromStretchableTexture(widget, rect2, *params,
+                                      parentRibbon->m_deactivated ||
+                                        widget->m_deactivated);
+
+        for (unsigned int n=0; n<MATERIAL_MAX_TEXTURES; n++)
+        {
+            material2D.UseMipMaps = true;
+        }
+    }
+
+    /* vertical tab-bar ribbons */
+    else if (type == RIBBON_VERTICAL_TABS)
+    {
+        video::SMaterial& material2D =
+            irr_driver->getVideoDriver()->getMaterial2D();
+        for (unsigned int n=0; n<MATERIAL_MAX_TEXTURES; n++)
+        {
+            material2D.UseMipMaps = false;
+        }
+
+        const bool mouseIn = rect.isPointInside(irr_driver->getDevice()
+                                                ->getCursorControl()
+                                                ->getPosition()        );
+
+        BoxRenderParams* params;
+
+        if (mark_selected && (focused || parent_focused))
+            params = &SkinConfig::m_render_params["verticalTab::focused"];
+        else if (parentRibbon->m_mouse_focus == widget && mouseIn)
+            params = &SkinConfig::m_render_params["verticalTab::focused"];
+        else if (mark_selected)
+            params = &SkinConfig::m_render_params["verticalTab::down"];
+        else
+            params = &SkinConfig::m_render_params["verticalTab::neutral"];
+
+
+        // automatically guess from position on-screen if tabs go left or right
+        unsigned int screen_width = irr_driver->getActualScreenSize().Width;
+        const bool horizontal_flip =
+            (unsigned int)rect.UpperLeftCorner.X > screen_width/ 2;
+        params->m_vertical_flip = false;
+
+        core::recti rect2 = rect;
+        if (mark_selected)
+        {
+            // the selected tab should be slighlty bigger than others
+            if (horizontal_flip) rect2.UpperLeftCorner.X -= screen_width/50;
+            else               rect2.LowerRightCorner.X += screen_width/50;
         }
 
         drawBoxFromStretchableTexture(widget, rect2, *params,
@@ -1142,13 +1192,13 @@ void Skin::drawRibbonChild(const core::recti &rect, Widget* widget,
                     return;
 
                 drawBoxFromStretchableTexture(parentRibbonWidget, rect,
-                    SkinConfig::m_render_params["squareFocusHalo::neutral"]);
+                    SkinConfig::m_render_params["squareFocusHalo1::neutral"]);
                 nPlayersOnThisItem++;
             }
         } // end if mark_focused
 
         //Handle drawing for everyone else
-        for (int i = 1; i < MAX_PLAYER_COUNT; i++) 
+        for (unsigned i = 1; i < MAX_PLAYER_COUNT; i++)
         {
             // ---- Draw selection for other players than player 1
             if (parentRibbon->isFocusedForPlayer(i) &&
@@ -1159,11 +1209,24 @@ void Skin::drawRibbonChild(const core::recti &rect, Widget* widget,
                 short green_previous = parentRibbonWidget->m_skin_g;
                 short blue_previous = parentRibbonWidget->m_skin_b;
 
-                SColorf color_rgb = GetPlayerColor(i);
-                
-                parentRibbonWidget->m_skin_r = short(color_rgb.r * 255.0f);
-                parentRibbonWidget->m_skin_g = short(color_rgb.g * 255.0f);
-                parentRibbonWidget->m_skin_b = short(color_rgb.b * 255.0f);
+                if (i>=4)
+                {
+                    SColorf color_rgb = getPlayerColor(i);
+
+                    parentRibbonWidget->m_skin_r = short(color_rgb.r * 255.0f);
+                    parentRibbonWidget->m_skin_g = short(color_rgb.g * 255.0f);
+                    parentRibbonWidget->m_skin_b = short(color_rgb.b * 255.0f);
+                }
+
+                std::string square_focus;
+
+                // 1 = player n°2
+                // TODO : current skins support 5 custom colors before using the coloring
+                //        but dynamic detection of the number of colors supported would be better
+                if (i>=5)
+                    square_focus = "squareFocusHaloBW::neutral";
+                else
+                    square_focus = "squareFocusHalo" + StringUtils::toString(i+1) + "::neutral";
 
                 if (nPlayersOnThisItem > 0)
                 {
@@ -1175,16 +1238,19 @@ void Skin::drawRibbonChild(const core::recti &rect, Widget* widget,
                     rect2.LowerRightCorner.Y += enlarge;
 
                     drawBoxFromStretchableTexture(parentRibbonWidget, rect2,
-                        SkinConfig::m_render_params["squareFocusHaloBW::neutral"]);
+                        SkinConfig::m_render_params[square_focus.c_str()]);
                 }
                 else
                 {
                     drawBoxFromStretchableTexture(parentRibbonWidget, rect,
-                        SkinConfig::m_render_params["squareFocusHaloBW::neutral"]);
+                        SkinConfig::m_render_params[square_focus.c_str()]);
                 }
-                parentRibbonWidget->m_skin_r = red_previous;
-                parentRibbonWidget->m_skin_g = green_previous;
-                parentRibbonWidget->m_skin_b = blue_previous;
+                if (i>=5)
+                {
+                    parentRibbonWidget->m_skin_r = red_previous;
+                    parentRibbonWidget->m_skin_g = green_previous;
+                    parentRibbonWidget->m_skin_b = blue_previous;
+                }
                 nPlayersOnThisItem++;
             }
         }
@@ -1245,16 +1311,20 @@ void Skin::drawSpinnerBody(const core::recti &rect, Widget* widget,
 
     BoxRenderParams* params;
     SpinnerWidget* q = dynamic_cast<SpinnerWidget*>(widget);
-    std::string texture = "squareFocusHalo::neutral";
+    std::string texture = "squareFocusHalo1::neutral";
     SColorf color_rgb = { 1,1,1,1 };
     if(q->getUseBackgroundColor())
     {
         int player_id=q->getSpinnerWidgetPlayerID();
-        
-        params = &SkinConfig::m_render_params[
-            "spinner::deactivated"];
 
-        color_rgb = GetPlayerColor(player_id);
+        std::string spinner = "spinner::deactivated";
+        
+        if (player_id <= 4)
+            spinner = "spinner" + StringUtils::toString(player_id+1) + "::neutral";
+
+        params = &SkinConfig::m_render_params[spinner];
+
+        color_rgb = getPlayerColor(player_id);
 
         texture = "squareFocusHaloBW::neutral";
     }
@@ -1270,27 +1340,32 @@ void Skin::drawSpinnerBody(const core::recti &rect, Widget* widget,
     {
         params=&SkinConfig::m_render_params["spinner::neutral"];
     }
-    widget->m_skin_r = short(color_rgb.r * 255.0f);
-    widget->m_skin_g = short(color_rgb.g * 255.0f);
-    widget->m_skin_b = short(color_rgb.b * 255.0f);
 
-    for (int i = 1; i < MAX_PLAYER_COUNT + 1; i++) 
+    for (unsigned i = 1; i < MAX_PLAYER_COUNT + 1; i++)
     {
-        if (widget->isFocusedForPlayer(i - 1)) {
+        if (widget->isFocusedForPlayer(i - 1))
+        {
+            if (i<=5)
+            {
+                texture = "squareFocusHalo" + StringUtils::toString(i) + "::neutral";
+            }
+            else
+            {
+                widget->m_skin_r = short(color_rgb.r * 255.0f);
+                widget->m_skin_g = short(color_rgb.g * 255.0f);
+                widget->m_skin_b = short(color_rgb.b * 255.0f);
+            }
+
             core::recti rect2 = rect;
             rect2.UpperLeftCorner.X += 2;
             rect2.UpperLeftCorner.Y -= 3;
             rect2.LowerRightCorner.X -= 2;
             rect2.LowerRightCorner.Y += 5;
-            
-            
             drawBoxFromStretchableTexture(widget, rect2,
                 SkinConfig::m_render_params[texture]);
             //TODO add squarefocushalo0
-
         }
     }
-    
 
     core::recti sized_rect = rect;
     if (m_dialog && m_dialog_size < 1.0f && widget->m_parent != NULL &&
@@ -1363,20 +1438,29 @@ void Skin::drawSpinnerBody(const core::recti &rect, Widget* widget,
 void Skin::drawSpinnerChild(const core::recti &rect, Widget* widget,
                             const bool pressed, bool focused)
 {
-    if (!widget->isVisible()) return;
+    if (!widget->isVisible() || widget->m_deactivated) return;
 
-    if (!widget->m_deactivated && pressed)
+    int areas = 0;
+    bool right;
+
+    if (widget->m_properties[PROP_ID] == "left")
     {
-        Widget* spinner = widget->m_event_handler;
-        int areas = 0;
+        areas = BoxRenderParams::LEFT;
+        right = false;
+    }
+    else if (widget->m_properties[PROP_ID] == "right")
+    {
+        areas = BoxRenderParams::RIGHT;
+        right = true;
+    }
+    else
+        return;
 
-        if (widget->m_properties[PROP_ID] == "left")
-            areas = BoxRenderParams::LEFT;
-        else if (widget->m_properties[PROP_ID] == "right")
-            areas = BoxRenderParams::RIGHT;
-        else
-            return;
+    SpinnerWidget* spinner = dynamic_cast<SpinnerWidget*>(widget->m_event_handler);
+    bool spinner_focused = spinner->isFocusedForPlayer(PLAYER_ID_GAME_MASTER);
 
+    if (pressed || (spinner->isRightButtonSelected() == right && spinner_focused))
+    {
         core::recti rect2(spinner->m_x, spinner->m_y,
                           spinner->m_x + spinner->m_w,
                           spinner->m_y + spinner->m_h  );
@@ -1387,7 +1471,7 @@ void Skin::drawSpinnerChild(const core::recti &rect, Widget* widget,
                                       widget->m_deactivated);
     }
 
-}
+} // drawSpinnerChild
 
 // ----------------------------------------------------------------------------
 /**
@@ -1465,6 +1549,18 @@ void Skin::drawIconButton(const core::recti &rect, Widget* widget,
     }
 
     IconButtonWidget* icon_widget = (IconButtonWidget*) widget;
+
+    if (icon_widget->hasTooltip())
+    {
+        const core::position2di mouse_position =
+            irr_driver->getDevice()->getCursorControl()->getPosition();
+
+        if (rect.isPointInside(mouse_position))
+        {
+            m_tooltip_at_mouse.push_back(true);
+            m_tooltips.push_back(widget);
+        }
+    }
 
     if (widget->m_type == WTYPE_MODEL_VIEW)
     {
@@ -1642,10 +1738,10 @@ void Skin::drawListHeader(const irr::core::rect< irr::s32 > &rect,
         ITexture* img;
         if (((ListWidget*)widget->m_event_handler)->m_sort_desc)
             img =
-                SkinConfig::m_render_params["list_sort_up::neutral"].getImage();
+                SkinConfig::m_render_params["list_sort_down::neutral"].getImage();
         else
             img =
-                SkinConfig::m_render_params["list_sort_down::neutral"].getImage();
+                SkinConfig::m_render_params["list_sort_up::neutral"].getImage();
 
         core::recti destRect(rect.UpperLeftCorner,
                              core::dimension2di(rect.getHeight(),
@@ -1705,10 +1801,10 @@ void Skin::renderSections(PtrVector<Widget>* within_vector)
 
                 // there's about 40 empty pixels at the top of bar.png
                 ITexture* tex =
-                    irr_driver->getTexture(FileManager::GUI,"bar.png");
+                    SkinConfig::m_render_params["bottom-bar::neutral"].getImage();
                 if(!tex)
                 {
-                    tex = irr_driver->getTexture(FileManager::GUI, "main_help.png");
+                    tex = irr_driver->getTexture(FileManager::GUI_ICON, "main_help.png");
                     if(!tex)
                         Log::fatal("Skin",
                         "Can't find fallback texture 'main_help.png, aborting.");
@@ -1722,7 +1818,7 @@ void Skin::renderSections(PtrVector<Widget>* within_vector)
             else if (widget.isTopBar())
             {
                 ITexture* tex =
-                    irr_driver->getTexture(FileManager::GUI, "top_bar.png");
+                    irr_driver->getTexture(FileManager::GUI_ICON, "top_bar.png");
 
                 core::recti r1(0,               0,
                                (int)widget.m_w, (int)widget.m_h);
@@ -2020,21 +2116,21 @@ void Skin::drawBadgeOn(const Widget* widget, const core::recti& rect)
 {
     if (widget->m_badges & LOCKED_BADGE)
     {
-        video::ITexture* texture = irr_driver->getTexture(FileManager::GUI,
+        video::ITexture* texture = irr_driver->getTexture(FileManager::GUI_ICON,
                                                           "gui_lock.png");
         float max_icon_size = 0.5f; // Lock badge can be quite big
         doDrawBadge(texture, rect, max_icon_size, true);
     }
     if (widget->m_badges & OK_BADGE)
     {
-        video::ITexture* texture = irr_driver->getTexture(FileManager::GUI,
+        video::ITexture* texture = irr_driver->getTexture(FileManager::GUI_ICON,
                                                           "green_check.png");
         float max_icon_size = 0.35f;
         doDrawBadge(texture, rect, max_icon_size, true);
     }
     if (widget->m_badges & BAD_BADGE)
     {
-        video::ITexture* texture = irr_driver->getTexture(FileManager::GUI,
+        video::ITexture* texture = irr_driver->getTexture(FileManager::GUI_ICON,
                                                           "red_mark.png");
         float max_icon_size = 0.35f;
         doDrawBadge(texture, rect, max_icon_size, false);
@@ -2042,28 +2138,28 @@ void Skin::drawBadgeOn(const Widget* widget, const core::recti& rect)
     if (widget->m_badges & TROPHY_BADGE)
     {
         float max_icon_size = 0.43f;
-        video::ITexture* texture = irr_driver->getTexture(FileManager::GUI,
+        video::ITexture* texture = irr_driver->getTexture(FileManager::GUI_ICON,
                                                           "cup_bronze.png");
         doDrawBadge(texture, rect, max_icon_size, false);
     }
     if (widget->m_badges & KEYBOARD_BADGE)
     {
         float max_icon_size = 0.43f;
-        video::ITexture* texture = irr_driver->getTexture(FileManager::GUI,
+        video::ITexture* texture = irr_driver->getTexture(FileManager::GUI_ICON,
                                                           "keyboard.png");
         doDrawBadge(texture, rect, max_icon_size, true);
     }
     if (widget->m_badges & GAMEPAD_BADGE)
     {
         float max_icon_size = 0.43f;
-        video::ITexture* texture = irr_driver->getTexture(FileManager::GUI,
+        video::ITexture* texture = irr_driver->getTexture(FileManager::GUI_ICON,
                                                           "gamepad.png");
         doDrawBadge(texture, rect, max_icon_size, true);
     }
     if (widget->m_badges & LOADING_BADGE)
     {
         float max_icon_size = 0.43f;
-        video::ITexture* texture = irr_driver->getTexture(FileManager::GUI,
+        video::ITexture* texture = irr_driver->getTexture(FileManager::GUI_ICON,
                                                           "hourglass.png");
         doDrawBadge(texture, rect, max_icon_size, true);
     }
@@ -2342,7 +2438,7 @@ ITexture* Skin::getImage(const char* name)
     }
     else
     {
-        return irr_driver->getTexture(FileManager::GUI,"main_help.png");
+        return irr_driver->getTexture(FileManager::GUI_ICON,"main_help.png");
     }
 }   // getImage
 

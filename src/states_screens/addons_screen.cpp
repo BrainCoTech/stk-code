@@ -62,25 +62,23 @@ AddonsScreen::AddonsScreen() : Screen("addons_screen.stkgui")
     m_date_filters.push_back(filter_9m);
     m_date_filters.push_back(filter_1y);
     m_date_filters.push_back(filter_2y);
-
-    m_show_tips = true;
 }   // AddonsScreen
 
 // ----------------------------------------------------------------------------
 
 void AddonsScreen::loadedFromFile()
 {
-    video::ITexture* icon1 = irr_driver->getTexture( file_manager->getAsset(FileManager::GUI,
+    video::ITexture* icon1 = irr_driver->getTexture( file_manager->getAsset(FileManager::GUI_ICON,
                                                      "package.png"         ));
-    video::ITexture* icon2 = irr_driver->getTexture( file_manager->getAsset(FileManager::GUI,
+    video::ITexture* icon2 = irr_driver->getTexture( file_manager->getAsset(FileManager::GUI_ICON,
                                                      "no-package.png"      ));
-    video::ITexture* icon3 = irr_driver->getTexture( file_manager->getAsset(FileManager::GUI,
+    video::ITexture* icon3 = irr_driver->getTexture( file_manager->getAsset(FileManager::GUI_ICON,
                                                      "package-update.png"  ));
-    video::ITexture* icon4 = irr_driver->getTexture( file_manager->getAsset(FileManager::GUI,
+    video::ITexture* icon4 = irr_driver->getTexture( file_manager->getAsset(FileManager::GUI_ICON,
                                                      "package-featured.png"));
-    video::ITexture* icon5 = irr_driver->getTexture( file_manager->getAsset(FileManager::GUI,
+    video::ITexture* icon5 = irr_driver->getTexture( file_manager->getAsset(FileManager::GUI_ICON,
                                                   "no-package-featured.png"));
-    video::ITexture* icon6 = irr_driver->getTexture( file_manager->getAsset(FileManager::GUI,
+    video::ITexture* icon6 = irr_driver->getTexture( file_manager->getAsset(FileManager::GUI_ICON,
                                                      "loading.png"));
 
     m_icon_bank = new irr::gui::STKModifiedSpriteBank( GUIEngine::getGUIEnv());
@@ -94,11 +92,6 @@ void AddonsScreen::loadedFromFile()
     GUIEngine::ListWidget* w_list =
         getWidget<GUIEngine::ListWidget>("list_addons");
     w_list->setColumnListener(this);
-
-    GUIEngine::LabelWidget* w_tips =
-        getWidget<GUIEngine::LabelWidget>("tips_label");
-    w_tips->setScrollSpeed(15);
-
 }   // loadedFromFile
 
 
@@ -133,26 +126,6 @@ void AddonsScreen::beforeAddingWidget()
     {
         w_filter_rating->addLabel(StringUtils::toWString(n / 2.0));
     }
-
-
-    GUIEngine::LabelWidget *w_tips =
-        getWidget<GUIEngine::LabelWidget>("tips_label");
-    bool ip = UserConfigParams::m_internet_status == RequestManager::IPERM_ALLOWED;
-    if(!ip)
-    {
-        w_tips->setVisible(true);
-
-        w_tips->setText( _("Access to the Internet is disabled. "
-                           "(To enable it, go to options and "
-                           "select tab 'User Interface')"),
-                         false);
-
-        w_tips->m_properties[GUIEngine::PROP_HEIGHT] = "fit";
-        calculateLayout();
-
-        m_show_tips = true;
-    }
-
 }
 // ----------------------------------------------------------------------------
 
@@ -161,10 +134,6 @@ void AddonsScreen::init()
     Screen::init();
 
     m_reloading = false;
-
-    m_sort_desc = false;
-    m_sort_default = true;
-    m_sort_col = 0;
 
     getWidget<GUIEngine::RibbonWidget>("category")->setActive(false);
 
@@ -182,19 +151,6 @@ void AddonsScreen::init()
     m_type = "kart";
 
     bool ip = UserConfigParams::m_internet_status == RequestManager::IPERM_ALLOWED;
-    if(ip)
-    {
-        // Nothing to show in the tips label, disable it.
-
-        GUIEngine::LabelWidget *w_tips =
-            getWidget<GUIEngine::LabelWidget>("tips_label");
-
-        w_tips->setVisible(false);
-        w_tips->m_properties[GUIEngine::PROP_HEIGHT] = "0";
-        calculateLayout();
-        m_show_tips = false;
-    } // ip
-
     getWidget<GUIEngine::IconButtonWidget>("reload")->setActive(ip);
 
     // Reset filter.
@@ -232,7 +188,7 @@ void AddonsScreen::tearDown()
  *  updated.
  *  \param type Must be 'kart' or 'track'.
  */
-void AddonsScreen::loadList()
+void AddonsScreen::loadList(bool sort_desc)
 {
 #ifndef SERVER_ONLY
     // Get the filter by words.
@@ -287,7 +243,7 @@ void AddonsScreen::loadList()
 
         sorted_list.push_back(&addon);
     }
-    sorted_list.insertionSort(/*start=*/0, m_sort_desc);
+    sorted_list.insertionSort(/*start=*/0, sort_desc);
 
     GUIEngine::ListWidget* w_list =
         getWidget<GUIEngine::ListWidget>("list_addons");
@@ -420,33 +376,20 @@ void AddonsScreen::loadList()
 }   // loadList
 
 // ----------------------------------------------------------------------------
-void AddonsScreen::onColumnClicked(int column_id)
+void AddonsScreen::onColumnClicked(int column_id, bool sort_desc, bool sort_default)
 {
-    if (m_sort_col != column_id)
-    {
-        m_sort_desc = false;
-        m_sort_default = false;
-    }
-    else
-    {
-        if (!m_sort_default) m_sort_desc = !m_sort_desc;
-        m_sort_default = !m_sort_desc && !m_sort_default;
-    }
-    
-    m_sort_col = column_id;
-
     switch(column_id)
     {
     case 0:
-        Addon::setSortOrder(m_sort_default ? Addon::SO_DEFAULT : Addon::SO_NAME);
+        Addon::setSortOrder(sort_default ? Addon::SO_DEFAULT : Addon::SO_NAME);
         break;
     case 1:
-        Addon::setSortOrder(m_sort_default ? Addon::SO_DEFAULT : Addon::SO_DATE);
+        Addon::setSortOrder(sort_default ? Addon::SO_DEFAULT : Addon::SO_DATE);
         break;
     default: assert(0); break;
     }   // switch
     /** \brief Toggle the sort order after column click **/
-    loadList();
+    loadList(sort_desc && !sort_default);
 }   // onColumnClicked
 
 // ----------------------------------------------------------------------------
@@ -563,23 +506,6 @@ void AddonsScreen::onUpdate(float dt)
         else
         {
             // Addons manager is still initialising/downloading.
-        }
-    }
-
-
-    if(m_show_tips)
-    {
-        GUIEngine::LabelWidget *w_tips =
-            getWidget<GUIEngine::LabelWidget>("tips_label");
-    
-        w_tips->update(dt);
-        if(w_tips->scrolledOff())
-        {
-            // Tips have been shown once. Disable tips_label.
-            w_tips->setVisible(false);
-            w_tips->m_properties[GUIEngine::PROP_HEIGHT] = "0";
-            calculateLayout();
-            m_show_tips = false;
         }
     }
 #endif

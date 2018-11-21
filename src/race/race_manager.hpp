@@ -88,8 +88,12 @@ public:
     */
     enum MajorRaceModeType
     {
-        MAJOR_MODE_GRAND_PRIX,
-        MAJOR_MODE_SINGLE
+        MAJOR_MODE_GRAND_PRIX = 0,
+        MAJOR_MODE_SINGLE,
+        MAJOR_MODE_FREE_FOR_ALL,
+        MAJOR_MODE_CAPTURE_THE_FLAG,
+        MAJOR_MODE_3_STRIKES
+
     };
 
     // quick method to tell the difference between battle modes and race modes
@@ -112,7 +116,7 @@ public:
         MINOR_MODE_OVERWORLD     = LINEAR_RACE(3, false),
         MINOR_MODE_TUTORIAL      = LINEAR_RACE(4, false),
 
-        MINOR_MODE_3_STRIKES     = BATTLE_ARENA(0),
+        MINOR_MODE_BATTLE        = BATTLE_ARENA(0),
         MINOR_MODE_SOCCER        = BATTLE_ARENA(1),
         MINOR_MODE_CUTSCENE      = BATTLE_ARENA(2),
         MINOR_MODE_EASTER_EGG    = EASTER_EGG(0)
@@ -138,7 +142,7 @@ public:
             case MINOR_MODE_NORMAL_RACE:    return IDENT_STD;
             case MINOR_MODE_TIME_TRIAL:     return IDENT_TTRIAL;
             case MINOR_MODE_FOLLOW_LEADER:  return IDENT_FTL;
-            case MINOR_MODE_3_STRIKES:      return IDENT_STRIKES;
+            case MINOR_MODE_BATTLE:      return IDENT_STRIKES;
             case MINOR_MODE_EASTER_EGG:     return IDENT_EASTER;
             case MINOR_MODE_SOCCER:         return IDENT_SOCCER;
             default: assert(false);
@@ -154,12 +158,12 @@ public:
     {
         switch (mode)
         {
-            case MINOR_MODE_NORMAL_RACE:    return "/gui/mode_normal.png";
-            case MINOR_MODE_TIME_TRIAL:     return "/gui/mode_tt.png";
-            case MINOR_MODE_FOLLOW_LEADER:  return "/gui/mode_ftl.png";
-            case MINOR_MODE_3_STRIKES:      return "/gui/mode_3strikes.png";
-            case MINOR_MODE_EASTER_EGG:     return "/gui/mode_easter.png";
-            case MINOR_MODE_SOCCER:         return "/gui/mode_soccer.png";
+            case MINOR_MODE_NORMAL_RACE:    return "/gui/icons/mode_normal.png";
+            case MINOR_MODE_TIME_TRIAL:     return "/gui/icons/mode_tt.png";
+            case MINOR_MODE_FOLLOW_LEADER:  return "/gui/icons/mode_ftl.png";
+            case MINOR_MODE_BATTLE:      return "/gui/icons/mode_3strikes.png";
+            case MINOR_MODE_EASTER_EGG:     return "/gui/icons/mode_easter.png";
+            case MINOR_MODE_SOCCER:         return "/gui/icons/mode_soccer.png";
             default: assert(false); return NULL;
         }
     }   // getIconOf
@@ -179,7 +183,7 @@ public:
             //I18N: Game mode
             case MINOR_MODE_FOLLOW_LEADER:  return _("Follow the Leader");
             //I18N: Game mode
-            case MINOR_MODE_3_STRIKES:      return _("3 Strikes Battle");
+            case MINOR_MODE_BATTLE:      return _("3 Strikes Battle");
             //I18N: Game mode
             case MINOR_MODE_EASTER_EGG:     return _("Egg Hunt");
             //I18N: Game mode
@@ -197,7 +201,7 @@ public:
             case MINOR_MODE_NORMAL_RACE:    return true;
             case MINOR_MODE_TIME_TRIAL:     return true;
             case MINOR_MODE_FOLLOW_LEADER:  return true;
-            case MINOR_MODE_3_STRIKES:      return true;
+            case MINOR_MODE_BATTLE:      return true;
             case MINOR_MODE_EASTER_EGG:     return false;
             case MINOR_MODE_SOCCER:         return true;
             default: assert(false);         return false;
@@ -216,7 +220,7 @@ public:
         if      (name==IDENT_STD    ) return MINOR_MODE_NORMAL_RACE;
         else if (name==IDENT_TTRIAL ) return MINOR_MODE_TIME_TRIAL;
         else if (name==IDENT_FTL    ) return MINOR_MODE_FOLLOW_LEADER;
-        else if (name==IDENT_STRIKES) return MINOR_MODE_3_STRIKES;
+        else if (name==IDENT_STRIKES) return MINOR_MODE_BATTLE;
         else if (name==IDENT_EASTER ) return MINOR_MODE_EASTER_EGG;
         else if (name==IDENT_SOCCER)  return MINOR_MODE_SOCCER;
 
@@ -272,6 +276,8 @@ public:
         /** In GPs, at the end, will hold the overall rank of this kart
          *  (0<=m_gp_rank < num_karts-1). */
         int         m_gp_rank;
+        /** Boosted status (AI only). */
+        bool        m_boosted_ai;
         /** The difficulty for this player. */
         PerPlayerDifficulty m_difficulty;
 
@@ -285,7 +291,7 @@ public:
                    m_local_player_id(local_player_id),
                    m_global_player_id(global_player_id),
                    m_gp_rank(init_gp_rank), m_difficulty(difficulty)
-                {}
+                { m_boosted_ai = false; }
 
     };   // KartStatus
 private:
@@ -330,13 +336,14 @@ private:
     GrandPrixData                    m_grand_prix;
     SavedGrandPrix*                  m_saved_gp;
     int                              m_num_karts;
+    unsigned int                     m_num_ghost_karts;
     unsigned int                     m_num_spare_tire_karts;
     unsigned int                     m_num_finished_karts;
     unsigned int                     m_num_finished_players;
     int                              m_coin_target;
     float                            m_time_target;
     int                              m_goal_target;
-
+    int                              m_hit_capture_limit;
     void startNextRace();    // start a next race
 
     friend bool operator< (const KartStatus& left, const KartStatus& right)
@@ -366,9 +373,9 @@ public:
     void setPlayerKart(unsigned int player_id,
                        const RemoteKartInfo& ki);
 
-    /** Sets additional information for a player to indicate which soccer team it belong to
+    /** Sets additional information for a player to indicate which team it belong to
     */
-    void setKartSoccerTeam(unsigned int player_id, SoccerTeam team);
+    void setKartTeam(unsigned int player_id, KartTeam team);
 
     /** Sets the per-player difficulty for a player.
      */
@@ -507,6 +514,14 @@ public:
      *  AI karts. */
     unsigned int getNumberOfKarts() const {return m_num_karts; }
     // ------------------------------------------------------------------------
+    unsigned int getNumberOfAIKarts() const
+    {
+        return (unsigned int)m_ai_kart_list.size(); 
+    }   // getNumberOfAIKarts
+    // ------------------------------------------------------------------------
+    unsigned int getNumNonGhostKarts() const
+                                    { return m_num_karts - m_num_ghost_karts; }
+    // ------------------------------------------------------------------------
     MajorRaceModeType getMajorMode() const { return m_major_mode; }
     // ------------------------------------------------------------------------
     MinorRaceModeType getMinorMode() const { return m_minor_mode; }
@@ -518,7 +533,7 @@ public:
             case MINOR_MODE_NORMAL_RACE:    return "normal";
             case MINOR_MODE_TIME_TRIAL:     return "time-trial";
             case MINOR_MODE_FOLLOW_LEADER:  return "follow-the-leader";
-            case MINOR_MODE_3_STRIKES:      return "battle";
+            case MINOR_MODE_BATTLE:      return "battle";
             case MINOR_MODE_EASTER_EGG:     return "egg-hunt";
             case MINOR_MODE_SOCCER:         return "soccer";
             default: assert(false);         return "";
@@ -538,7 +553,7 @@ public:
      */
     int getNumLaps() const
     {
-        if(m_minor_mode==MINOR_MODE_3_STRIKES      ||
+        if(m_minor_mode==MINOR_MODE_BATTLE      ||
             m_minor_mode==MINOR_MODE_FOLLOW_LEADER ||
             m_minor_mode==MINOR_MODE_SOCCER        ||
             m_minor_mode==MINOR_MODE_EASTER_EGG  )
@@ -636,6 +651,11 @@ public:
         return m_kart_status[kart].m_difficulty;
     }   // getPlayerDifficulty
     // ------------------------------------------------------------------------
+    bool hasBoostedAI(int kart) const
+    {
+        return m_kart_status[kart].m_boosted_ai;
+    }   // getKartRaceTime
+    // ------------------------------------------------------------------------
     int getCoinTarget() const { return m_coin_target; }
     // ------------------------------------------------------------------------
     float getTimeTarget() const { return m_time_target; }
@@ -703,6 +723,12 @@ public:
     }   // isTutorialMode
 
     // ------------------------------------------------------------------------
+    bool isFollowMode()
+    {
+        return m_minor_mode == MINOR_MODE_FOLLOW_LEADER;
+    }
+ 
+    // ------------------------------------------------------------------------
     bool isEggHuntMode()
     {
         return m_minor_mode == MINOR_MODE_EASTER_EGG;
@@ -713,6 +739,15 @@ public:
     {
         return m_minor_mode == MINOR_MODE_TIME_TRIAL;
     }   //  isTimeTrialMode
+    // ------------------------------------------------------------------------
+     /** \brief Returns the number of second's decimals to display */
+    int currentModeTimePrecision()
+    {
+        if (isEggHuntMode() || isTimeTrialMode())
+            return 3;//display milliseconds
+
+        return 2;//display centiseconds
+    }   // currentModeTimePrecision
     // ------------------------------------------------------------------------
     /** \brief Returns true if the current mode has laps. */
     bool modeHasLaps()
@@ -731,7 +766,7 @@ public:
         //       and each World may set m_use_highscores to true or false.
         //       The reason for this duplication is that we might want to know
         //       whether to display highscores without creating a World.
-        return m_minor_mode != MINOR_MODE_3_STRIKES &&
+        return m_minor_mode != MINOR_MODE_BATTLE &&
                m_minor_mode != MINOR_MODE_SOCCER &&
                m_minor_mode != MINOR_MODE_FOLLOW_LEADER;
     }   // modeHasHighscore
@@ -831,6 +866,20 @@ public:
     void configGrandPrixResultFromNetwork(NetworkString& ns);
     // ------------------------------------------------------------------------
     void clearNetworkGrandPrixResult();
+    // ------------------------------------------------------------------------
+    void setHitCaptureTime(int hc, float time)
+    {
+        m_hit_capture_limit = hc;
+        m_time_target = time;
+    }
+    // ------------------------------------------------------------------------
+    int getHitCaptureLimit() const              { return m_hit_capture_limit; }
+    // ------------------------------------------------------------------------
+    bool teamEnabled() const
+    {
+        return m_minor_mode == MINOR_MODE_SOCCER ||
+            m_major_mode == MAJOR_MODE_CAPTURE_THE_FLAG;
+    }
 
 };   // RaceManager
 

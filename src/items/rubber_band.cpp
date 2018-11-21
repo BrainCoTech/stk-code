@@ -45,9 +45,12 @@
 RubberBand::RubberBand(Plunger *plunger, AbstractKart *kart)
           : m_plunger(plunger), m_owner(kart)
 {
+    m_hit_kart = NULL;
     m_attached_state = RB_TO_PLUNGER;
+    updatePosition();
+
 #ifndef SERVER_ONLY
-    if (ProfileWorld::isNoGraphics())
+    if (ProfileWorld::isNoGraphics() || !CVS->isGLSL())
     {
         return;
     }
@@ -68,7 +71,6 @@ RubberBand::RubberBand(Plunger *plunger, AbstractKart *kart)
     {
         m_dy_dc->getSPMVertex()[i].m_color = color;
     }
-    updatePosition();
     SP::addDynamicDrawCall(m_dy_dc);
 #endif
 }   // RubberBand
@@ -76,12 +78,7 @@ RubberBand::RubberBand(Plunger *plunger, AbstractKart *kart)
 // ----------------------------------------------------------------------------
 RubberBand::~RubberBand()
 {
-#ifndef SERVER_ONLY
-    if (m_dy_dc)
-    {
-        m_dy_dc->removeFromSP();
-    }
-#endif
+    remove();
 }   // RubberBand
 
 // ----------------------------------------------------------------------------
@@ -102,16 +99,22 @@ void RubberBand::updatePosition()
     case RB_TO_PLUNGER: m_end_position = m_plunger->getXYZ();
                         checkForHit(k, m_end_position);        break;
     }   // switch(m_attached_state);
+}   // updatePosition
 
+// ----------------------------------------------------------------------------
+void RubberBand::updateGraphics(float dt)
+{
 #ifndef SERVER_ONLY
     if (!m_dy_dc)
     {
         return;
     }
+
     // Update the rubber band positions
     // --------------------------------
     // Todo: make height dependent on length (i.e. rubber band gets
     // thinner). And call explosion if the band is too long.
+    const Vec3 &k = m_owner->getXYZ();
     const float hh=.1f;  // half height of the band
     const Vec3 &p=m_end_position;  // for shorter typing
     auto& v = m_dy_dc->getVerticesVector();
@@ -137,7 +140,7 @@ void RubberBand::updatePosition()
     m_dy_dc->setUpdateOffset(0);
     m_dy_dc->recalculateBoundingBox();
 #endif
-}   // updatePosition
+}   // updateGraphics
 
 // ----------------------------------------------------------------------------
 /** Updates the rubber band. It takes the new position of the kart and the
@@ -274,6 +277,38 @@ void RubberBand::hit(AbstractKart *kart_hit, const Vec3 *track_xyz)
     // =================
     m_hit_position   = *track_xyz;
     m_attached_state = RB_TO_TRACK;
+    m_hit_kart       = NULL;
 }   // hit
 
 // ----------------------------------------------------------------------------
+void RubberBand::remove()
+{
+#ifndef SERVER_ONLY
+    if (m_dy_dc)
+    {
+        m_dy_dc->removeFromSP();
+        m_dy_dc = nullptr;
+    }
+#endif
+}   // remove
+
+// ----------------------------------------------------------------------------
+uint8_t RubberBand::get8BitState() const
+{
+    uint8_t state = (uint8_t)(m_attached_state & 3);
+    state |= m_attached_state == RB_TO_KART && m_hit_kart ?
+        (m_hit_kart->getWorldKartId() << 3) : 0;
+    return state;
+}   // get8BitState
+
+// ----------------------------------------------------------------------------
+void RubberBand::set8BitState(uint8_t bit_state)
+{
+    m_hit_kart = NULL;
+    m_attached_state = (RubberBandTo)(bit_state & 3);
+    if (m_attached_state == RB_TO_KART)
+    {
+        unsigned kart = bit_state >> 3;
+        m_hit_kart = World::getWorld()->getKart(kart);
+    }
+}   // set8BitState

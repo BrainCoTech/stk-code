@@ -21,7 +21,7 @@
 #ifdef SKID_DEBUG
 #  include "graphics/show_curve.hpp"
 #endif
-#include "achievements/achievement_info.hpp"
+#include "achievements/achievements_status.hpp"
 #include "config/player_manager.hpp"
 #include "karts/kart.hpp"
 #include "karts/kart_gfx.hpp"
@@ -30,6 +30,7 @@
 #include "karts/controller/controller.hpp"
 #include "modes/world.hpp"
 #include "network/network_string.hpp"
+#include "network/rewind_manager.hpp"
 #include "physics/btKart.hpp"
 #include "tracks/track.hpp"
 #include "utils/log.hpp"
@@ -66,7 +67,7 @@ Skidding::~Skidding()
  */
 void Skidding::reset()
 {
-    m_skid_time           = 0.0f;
+    m_skid_time           = 0;
     m_skid_state          = SKID_NONE;
     m_skid_factor         = 1.0f;
     m_real_steering       = 0.0f;
@@ -77,27 +78,31 @@ void Skidding::reset()
     m_kart->getKartGFX()->setCreationRateAbsolute(KartGFX::KGFX_SKIDR, 0);
     m_kart->getKartGFX()->updateSkidLight(0);
     m_kart->getControls().setSkidControl(KartControl::SC_NONE);
-    
+    m_prev_visual_rotation = 0.0f;
+    m_graphical_remaining_jump_time = 0.0f;
+    m_smoothing_time = 0.0f;
+    m_smoothing_dt = -1.0f;
+    m_skid_bonus_end_ticks = -1;
+
     btVector3 rot(0, 0, 0);
     // Only access the vehicle if the kart is not a ghost
     if (!m_kart->isGhostKart())
-        m_kart->getVehicle()->setTimedRotation(0, rot);
+        m_kart->getVehicle()->setTimedRotation(0, 0);
 }   // reset
 
 // ----------------------------------------------------------------------------
 /** Save the skidding state of a kart. It only saves the important physics
  *  values including m_remaining_jump_time (while this is mostly a graphical
  *  effect, you can't skid while still doing a jump, so it does affect the
- *  state), but not visual only values like m_visual_rotation. Similarly
- *  m_real_steering is output of updateRewind() and will be recomputed every
- *  frame when update() is called, and similar for m_skid_bonus_ready
+ *  state). Similarly m_real_steering is output of updateRewind() and will be
+ *  recomputed every frame when update() is called, and similar for
+ *  m_skid_bonus_ready
  *  \param buffer Buffer for the state information. 
  */
 void Skidding::saveState(BareNetworkString *buffer)
 {
     buffer->addUInt8(m_skid_state);
-    buffer->addFloat(m_remaining_jump_time);
-    buffer->addFloat(m_skid_time);
+    buffer->addUInt16(m_skid_time);
     buffer->addFloat(m_skid_factor);
     buffer->addFloat(m_visual_rotation);
 }   // saveState
@@ -109,11 +114,29 @@ void Skidding::saveState(BareNetworkString *buffer)
 void Skidding::rewindTo(BareNetworkString *buffer)
 {
     m_skid_state = (SkidState)buffer->getUInt8();
-    m_remaining_jump_time = buffer->getFloat();
-    m_skid_time = buffer->getFloat();
+    m_skid_time = buffer->getUInt16();
     m_skid_factor = buffer->getFloat();
     m_visual_rotation = buffer->getFloat();
 }   // rewindTo
+
+// ----------------------------------------------------------------------------
+void Skidding::prepareSmoothing()
+{
+    m_prev_visual_rotation = getVisualSkidRotation();
+}   // prepareSmoothing
+
+// ----------------------------------------------------------------------------
+void Skidding::checkSmoothing()
+{
+    float diff = fabsf(m_prev_visual_rotation - m_visual_rotation);
+    if (diff > 0.1f)
+    {
+        m_smoothing_time = m_kart->getTimeFullSteer(diff);
+        m_smoothing_dt = 0.0f;
+    }
+    else
+        m_smoothing_dt = -1.0f;
+}   // checkSmoothing
 
 // ----------------------------------------------------------------------------
 /** Computes the actual steering fraction to be used in the physics, and
@@ -122,9 +145,11 @@ void Skidding::rewindTo(BareNetworkString *buffer)
  *  kart skids either left or right, the steering fraction is bound by
  *  reduce-turn-min and reduce-turn-max.
  */
-float Skidding::updateSteering(float steer, float dt)
+float Skidding::updateSteering(float steer, int ticks)
 {
-    float steer_result;
+    float dt = stk_config->ticks2Time(ticks);
+    float skid_time_float = stk_config->ticks2Time(m_skid_time);
+    float steer_result = 0.0f;
 
     const KartProperties *kp = m_kart->getKartProperties();
 
@@ -134,9 +159,10 @@ float Skidding::updateSteering(float steer, float dt)
     case SKID_SHOW_GFX_RIGHT:
     case SKID_NONE:
         steer_result = steer;
-        if (m_skid_time < kp->getSkidVisualTime() && m_skid_time > 0)
+        if (skid_time_float < kp->getSkidVisualTime() &&
+            skid_time_float > 0)
         {
-            float f = m_visual_rotation - m_visual_rotation*dt/m_skid_time;
+            float f = m_visual_rotation - m_visual_rotation*dt/skid_time_float;
             // Floating point errors when m_skid_time is very close to 0
             // can result in visual rotation set to a large number
             if( (f<0 && m_visual_rotation>0 ) ||
@@ -160,9 +186,9 @@ float Skidding::updateSteering(float steer, float dt)
             float f = (1.0f+steer)*0.5f;   // map [-1,1] --> [0, 1]
             steer_result  = kp->getSkidReduceTurnMin()
                              + m_skid_reduce_turn_delta * f;
-            if(m_skid_time < kp->getSkidVisualTime())
+            if(skid_time_float < kp->getSkidVisualTime())
                 m_visual_rotation = kp->getSkidVisual()
-                                  * steer_result * m_skid_time
+                                  * steer_result * skid_time_float
                                   / kp->getSkidVisualTime();
             else
                 m_visual_rotation = kp->getSkidVisual() * steer_result;
@@ -173,9 +199,9 @@ float Skidding::updateSteering(float steer, float dt)
             float f = (-1.0f+steer)*0.5f;   // map [-1,1] --> [-1, 0]
             steer_result   = -kp->getSkidReduceTurnMin()
                                + m_skid_reduce_turn_delta * f;
-            if(m_skid_time < kp->getSkidVisualTime())
+            if(skid_time_float < kp->getSkidVisualTime())
                 m_visual_rotation = kp->getSkidVisual()
-                                  * steer_result * m_skid_time
+                                  * steer_result * skid_time_float
                                   / kp->getSkidVisualTime();
             else
                 m_visual_rotation = kp->getSkidVisual() * steer_result;
@@ -230,11 +256,67 @@ float Skidding::getSteeringWhenSkidding(float steering) const
  */
 float Skidding::updateGraphics(float dt)
 {
-    if (m_remaining_jump_time <= 0) return 0;
+    m_kart->getKartGFX()->setCreationRateAbsolute(KartGFX::KGFX_SKIDL, 0);
+    m_kart->getKartGFX()->setCreationRateAbsolute(KartGFX::KGFX_SKIDR, 0);
+    m_kart->getKartGFX()->updateSkidLight(0);
 
-    if (m_remaining_jump_time < 0)
+    float bonus_time, bonus_speed, bonus_force;
+    unsigned int level = getSkidBonus(&bonus_time, &bonus_speed, &bonus_force);
+    if (m_kart->m_max_speed
+        ->isSpeedIncreaseActive(MaxSpeed::MS_INCREASE_SKIDDING) &&
+        m_skid_bonus_end_ticks > World::getWorld()->getTicksSinceStart())
     {
-        m_remaining_jump_time = 0.0f;
+        level = 1;
+    }
+    else if (m_kart->m_max_speed
+        ->isSpeedIncreaseActive(MaxSpeed::MS_INCREASE_RED_SKIDDING) &&
+        m_skid_bonus_end_ticks > World::getWorld()->getTicksSinceStart())
+    {
+        level = 2;
+    }
+
+    if (level == 0 && m_graphical_remaining_jump_time <= 0.0f &&
+        m_skid_state != SKID_NONE)
+    {
+        // Show tiny sparks if bonus not yet reached
+        m_kart->getKartGFX()->setSkidLevel(level);
+    }
+    else if (level >= 1)
+    {
+        // If at least level 1 bonus is reached, show appropriate gfx
+        m_kart->getKartGFX()->setSkidLevel(level);
+        m_kart->getKartGFX()->updateSkidLight(level);
+    }
+
+    if (bonus_time > 0 || level == 1 || level == 2)
+    {
+        m_kart->getKartGFX()->setCreationRateRelative(KartGFX::KGFX_SKIDL,
+            1.0f);
+        m_kart->getKartGFX()->setCreationRateRelative(KartGFX::KGFX_SKIDR,
+            1.0f);
+    }
+    else if (m_skid_state == SKID_BREAK || m_skid_state == SKID_SHOW_GFX_LEFT
+        || m_skid_state == SKID_SHOW_GFX_RIGHT)
+    {
+        m_kart->getKartGFX()->setCreationRateAbsolute(KartGFX::KGFX_SKIDL,
+            0.0f);
+        m_kart->getKartGFX()->setCreationRateAbsolute(KartGFX::KGFX_SKIDR,
+            0.0f);
+    }
+
+    if (m_smoothing_dt >= 0.0f)
+    {
+        m_smoothing_dt += dt / m_smoothing_time;
+        if (m_smoothing_dt > 1.0f)
+            m_smoothing_dt = -1.0f;
+    }
+
+    if (m_graphical_remaining_jump_time <= 0) return 0;
+
+    m_graphical_remaining_jump_time -= dt;
+    if (m_graphical_remaining_jump_time < 0)
+    {
+        m_graphical_remaining_jump_time = 0.0f;
         return 0.0f;
     }
 
@@ -248,9 +330,9 @@ float Skidding::updateGraphics(float dt)
     float gravity   = Track::getCurrentTrack()->getGravity();
     float v0        = 0.5f * gravity * kp->getSkidGraphicalJumpTime();
     float jump_time = kp->getSkidGraphicalJumpTime()
-                    - m_remaining_jump_time;
+                    - m_graphical_remaining_jump_time;
     return v0 * jump_time - 0.5f * gravity * jump_time * jump_time;
-    
+
 }   // updateGraphics
 
  // ----------------------------------------------------------------------------
@@ -288,8 +370,6 @@ void Skidding::update(int ticks, bool is_on_ground,
        m_skid_state != SKID_NONE && m_skid_state != SKID_BREAK)
     {
         m_skid_state = SKID_BREAK;
-        m_kart->getKartGFX()->setCreationRateAbsolute(KartGFX::KGFX_SKIDL, 0);
-        m_kart->getKartGFX()->setCreationRateAbsolute(KartGFX::KGFX_SKIDR, 0);
     }
 
     m_skid_bonus_ready = false;
@@ -367,6 +447,15 @@ void Skidding::update(int ticks, bool is_on_ground,
 
             // Some karts might use a graphical-only jump. Set it up:
             m_remaining_jump_time = kp->getSkidGraphicalJumpTime();
+            // Don't re-update for local player controller when rewinding
+            if (m_graphical_remaining_jump_time == 0.0f)
+            {
+                if (RewindManager::get()->isRewinding() &&
+                    !m_kart->getController()->isLocalPlayerController())
+                    m_graphical_remaining_jump_time = m_remaining_jump_time;
+                else if (!RewindManager::get()->isRewinding())
+                    m_graphical_remaining_jump_time = m_remaining_jump_time;
+            }
 
 #ifdef SKID_DEBUG
 #define SPEED 20.0f
@@ -379,6 +468,7 @@ void Skidding::update(int ticks, bool is_on_ground,
             m_predicted_curve->setHeading(m_kart->getHeading());
             float angle = m_kart->getMaxSteerAngle(SPEED)
                         * fabsf(getSteeringFraction());
+            //FIXME : what is this for ?
             float r = kp->getWheelBase()
                     / asin(angle)*1.0f;
 
@@ -425,20 +515,14 @@ void Skidding::update(int ticks, bool is_on_ground,
                 m_real_steering, m_kart->getSpeed(),
                 m_kart->getMaxSteerAngle(m_kart->getSpeed()));
 #endif
-            m_skid_time += dt;
+            m_skid_time += ticks;
             float bonus_time, bonus_speed, bonus_force;
             unsigned int level = getSkidBonus(&bonus_time, &bonus_speed,
                                               &bonus_force);
 
-            // Show tiny sparks if bonus not yet reached
-            if (level == 0 && m_remaining_jump_time <= 0.0f)
-                m_kart->getKartGFX()->setSkidLevel(level);
-            // If at least level 1 bonus is reached, show appropriate gfx
-            else if (level>=1)
+            if (level >= 1 && !(level == 0 && m_remaining_jump_time <= 0.0f))
             {
                 m_skid_bonus_ready = true;
-                m_kart->getKartGFX()->setSkidLevel(level);
-                m_kart->getKartGFX()->updateSkidLight(level);
             }
             // If player stops skidding, trigger bonus, and change state to
             // SKID_SHOW_GFX_*
@@ -447,58 +531,57 @@ void Skidding::update(int ticks, bool is_on_ground,
                 m_skid_state = m_skid_state == SKID_ACCUMULATE_LEFT
                              ? SKID_SHOW_GFX_LEFT
                              : SKID_SHOW_GFX_RIGHT;
-                float t = std::min(m_skid_time, kp->getSkidVisualTime());
+                float skid_time_float = stk_config->ticks2Time(m_skid_time);
+                float t = std::min(skid_time_float, kp->getSkidVisualTime());
                 t       = std::min(t,           kp->getSkidRevertVisualTime());
 
-                float vso = getVisualSkidRotation();
-                btVector3 rot(0, vso * kp->getSkidPostSkidRotateFactor(), 0);
-                m_kart->getVehicle()->setTimedRotation(t, rot);
+                m_kart->getVehicle()->setTimedRotation(
+                    (uint16_t)stk_config->time2Ticks(t),
+                    m_visual_rotation * kp->getSkidPostSkidRotateFactor());
                 // skid_time is used to count backwards for the GFX
-                m_skid_time = t;
+                m_skid_time = stk_config->time2Ticks(t);
                 if(bonus_time>0)
                 {
-                    m_kart->getKartGFX()
-                          ->setCreationRateRelative(KartGFX::KGFX_SKIDL, 1.0f);
-                    m_kart->getKartGFX()
-                          ->setCreationRateRelative(KartGFX::KGFX_SKIDR, 1.0f);
+                    unsigned int bonus_cat = (level == 1) ? MaxSpeed::MS_INCREASE_SKIDDING :
+                                                            MaxSpeed::MS_INCREASE_RED_SKIDDING;
                     m_kart->m_max_speed->
-                        instantSpeedIncrease(MaxSpeed::MS_INCREASE_SKIDDING,
-                               bonus_speed, bonus_speed,
+                        instantSpeedIncrease(bonus_cat,
+                               bonus_speed, bonus_speed/2,
                                bonus_force,
                                stk_config->time2Ticks(bonus_time),
                                /*fade-out-time*/ stk_config->time2Ticks(1.0f));
-                    
+
+                    m_skid_bonus_end_ticks = World::getWorld()->getTicksSinceStart() +
+                        stk_config->time2Ticks(1.0f);
+
                     if (m_kart->getController()->canGetAchievements())
                     {
                         PlayerManager::increaseAchievement(
-                                AchievementInfo::ACHIEVE_SKIDDING, "skidding");
+                                AchievementsStatus::SKIDDING_1LAP, 1);
+                        PlayerManager::increaseAchievement(
+                                AchievementsStatus::SKIDDING_1RACE, 1);
+                        PlayerManager::increaseAchievement(
+                                AchievementsStatus::SKIDDING, 1);
                     }
                 }
-                else {
-                    m_kart->getKartGFX()
-                          ->setCreationRateAbsolute(KartGFX::KGFX_SKIDL, 0);
-                    m_kart->getKartGFX()
-                          ->setCreationRateAbsolute(KartGFX::KGFX_SKIDR, 0);
-            }
+                else
+                {
+                    m_skid_bonus_end_ticks = -1;
+                }
             }
             break;
         }   // case
     case SKID_SHOW_GFX_LEFT:
     case SKID_SHOW_GFX_RIGHT:
-        m_skid_time -= dt;
-        if(m_skid_time<=0)
+        if (m_skid_time > 0)
+            m_skid_time -= ticks;
+        if (m_skid_time == 0)
         {
-            m_skid_time = 0;
-            m_kart->getKartGFX()
-                  ->setCreationRateAbsolute(KartGFX::KGFX_SKIDL, 0);
-            m_kart->getKartGFX()
-                  ->setCreationRateAbsolute(KartGFX::KGFX_SKIDR, 0);
-            m_kart->getKartGFX()->updateSkidLight(0);
             m_skid_state = SKID_NONE;
         }
     }   // switch
 
-    m_real_steering = updateSteering(steering, dt);
+    m_real_steering = updateSteering(steering, ticks);
 }   // update
 
 // ----------------------------------------------------------------------------
@@ -520,7 +603,8 @@ unsigned int Skidding::getSkidBonus(float *bonus_time,
     *bonus_force = 0;
     for (unsigned int i = 0; i < kp->getSkidBonusSpeed().size(); i++)
     {
-        if (m_skid_time <= kp->getSkidTimeTillBonus()[i])
+        if (stk_config->ticks2Time(m_skid_time) <=
+            kp->getSkidTimeTillBonus()[i])
             return i;
         *bonus_speed = kp->getSkidBonusSpeed()[i];
         *bonus_time  = kp->getSkidBonusTime()[i];
@@ -528,4 +612,3 @@ unsigned int Skidding::getSkidBonus(float *bonus_time,
     }
     return (unsigned int) kp->getSkidBonusSpeed().size();
 }   // getSkidBonusForce
-

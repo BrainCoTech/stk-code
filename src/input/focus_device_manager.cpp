@@ -1,5 +1,5 @@
 #include "input/focus_device_manager.hpp"
-#include "states_screens/options_screen_input.hpp"
+#include "states_screens/options/options_screen_input.hpp"
 #include "input/input_manager.hpp"
 #include "input/device_manager.hpp"
 #include "input/focus_device.hpp"

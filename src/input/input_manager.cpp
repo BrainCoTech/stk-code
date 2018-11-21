@@ -43,10 +43,10 @@
 #include "physics/physics.hpp"
 #include "race/history.hpp"
 #include "replay/replay_recorder.hpp"
-#include "states_screens/dialogs/splitscreen_player_dialog.hpp"
 #include "states_screens/kart_selection.hpp"
 #include "states_screens/main_menu_screen.hpp"
-#include "states_screens/options_screen_device.hpp"
+#include "states_screens/online/networking_lobby.hpp"
+#include "states_screens/options/options_screen_device.hpp"
 #include "states_screens/state_manager.hpp"
 #include "utils/debug.hpp"
 #include "utils/string_utils.hpp"
@@ -307,9 +307,9 @@ void InputManager::handleStaticAction(int key, int value)
                 fgets(s, 256, stdin);
                 int t;
                 StringUtils::fromString(s,t);
-                RewindManager::get()->rewindTo(t, world->getTimeTicks());
+                RewindManager::get()->rewindTo(t, world->getTicksSinceStart());
                 Log::info("Rewind", "Rewinding from %d to %d",
-                          world->getTimeTicks(), t);
+                          world->getTicksSinceStart(), t);
             }
             break;
 
@@ -401,7 +401,7 @@ void InputManager::handleStaticAction(int key, int value)
             {
                 AbstractKart* kart = world->getLocalPlayerKart(0);
                 if(control_is_pressed && race_manager->getMinorMode()!=
-                                          RaceManager::MINOR_MODE_3_STRIKES)
+                                          RaceManager::MINOR_MODE_BATTLE)
                     kart->setPowerup(PowerupManager::POWERUP_RUBBERBALL,
                                      10000);
                 else
@@ -757,10 +757,15 @@ void InputManager::dispatchInput(Input::InputType type, int deviceID,
                 {
                     device = m_device_manager->getGamePadFromIrrID(deviceID);
                 }
-                if (device && (action == PA_FIRE || action == PA_MENU_SELECT))
+                if (device && (action == PA_FIRE || action == PA_MENU_SELECT) &&
+                    !GUIEngine::ModalDialog::isADialogActive())
                 {
-                    if (!GUIEngine::ModalDialog::isADialogActive())
-                        new SplitscreenPlayerDialog(device);
+                    GUIEngine::Screen* screen = GUIEngine::getCurrentScreen();
+                    NetworkingLobby* lobby = dynamic_cast<NetworkingLobby*>(screen);
+                    if (lobby!=NULL)
+                    {
+                        lobby->openSplitscreenDialog(device);
+                    }
                     return;
                 }
             }
@@ -957,6 +962,7 @@ bool InputManager::masterPlayerOnly() const
  */
 EventPropagation InputManager::input(const SEvent& event)
 {
+    const float ORIENTATION_MULTIPLIER = 10.0f;
     if (event.EventType == EET_JOYSTICK_INPUT_EVENT)
     {
         // Axes - FIXME, instead of checking all of them, ask the bindings
@@ -1268,7 +1274,29 @@ EventPropagation InputManager::input(const SEvent& event)
             
             float factor = UserConfigParams::m_multitouch_tilt_factor;
             factor = std::max(factor, 0.1f);
-            device->updateAxisX(float(event.AccelerometerEvent.Y) / factor);
+            if (UserConfigParams::m_multitouch_controls == MULTITOUCH_CONTROLS_GYROSCOPE)
+            {
+                device->updateOrientationFromAccelerometer(event.AccelerometerEvent.X, event.AccelerometerEvent.Y);
+                device->updateAxisX(device->getOrientation() * ORIENTATION_MULTIPLIER / factor);
+            }
+            else
+            {
+                device->updateAxisX(float(event.AccelerometerEvent.Y) / factor);
+            }
+        }
+    }
+    else if (event.EventType == EET_GYROSCOPE_EVENT)
+    {
+        MultitouchDevice* device = m_device_manager->getMultitouchDevice();
+
+        if (device && device->isGyroscopeActive())
+        {
+            m_device_manager->updateMultitouchDevice();
+
+            float factor = UserConfigParams::m_multitouch_tilt_factor;
+            factor = std::max(factor, 0.1f);
+            device->updateOrientationFromGyroscope(event.GyroscopeEvent.Z);
+            device->updateAxisX(device->getOrientation() * ORIENTATION_MULTIPLIER / factor);
         }
     }
 

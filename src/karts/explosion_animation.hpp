@@ -64,15 +64,29 @@ protected:
      *  on difficulty (so that on easy you can drive again earlier. */
     float m_duration;
 
+    bool m_direct_hit;
+
+    /** If not -1, when > m_timer it will use m_reset_xyz below for
+     *  animation. */
+    int m_reset_ticks;
+
+    /** Used for reset kart back to flag base in CTF. */
+    Vec3 m_reset_xyz, m_reset_normal;
+
     ExplosionAnimation(AbstractKart *kart);
-    ExplosionAnimation(AbstractKart *kart, const Vec3 &pos,
-                       bool direct_hit);
 public:
+    ExplosionAnimation(AbstractKart *kart, const Vec3 &pos,
+                       bool direct_hit, bool from_state = false);
     static ExplosionAnimation *create(AbstractKart *kart, const Vec3 &pos,
                                       bool direct_hit);
     static ExplosionAnimation *create(AbstractKart *kart);
 
     virtual ~ExplosionAnimation();
-    virtual void update(float dt);
+    virtual void update(int ticks);
+    bool hasResetAlready() const
+                     { return m_reset_ticks != -1 && m_timer < m_reset_ticks; }
+    // ------------------------------------------------------------------------
+    virtual KartAnimationType getAnimationType() const
+            { return m_direct_hit ? KAT_EXPLOSION_DIRECT_HIT : KAT_EXPLOSION; }
 };   // ExplosionAnimation
 #endif

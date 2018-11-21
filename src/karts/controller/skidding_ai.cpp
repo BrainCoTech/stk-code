@@ -75,10 +75,9 @@ SkiddingAI::SkiddingAI(AbstractKart *kart)
 #ifdef COMPARE_AIS
     std::string name("");
     m_point_selection_algorithm = m_kart->getWorldKartId() % 2
-                                ? PSA_DEFAULT : PSA_FIXED;
+                                ? PSA_DEFAULT : PSA_NEW;
     switch(m_point_selection_algorithm)
     {
-    case PSA_FIXED   : name = "Fixed";   break;
     case PSA_NEW     : name = "New";     break;
     case PSA_DEFAULT : name = "Default"; break;
     }
@@ -165,6 +164,7 @@ void SkiddingAI::reset()
     m_time_since_stuck           = 0.0f;
     m_kart_ahead                 = NULL;
     m_distance_ahead             = 0.0f;
+    m_distance_leader            = 999.9f;
     m_kart_behind                = NULL;
     m_distance_behind            = 0.0f;
     m_current_curve_radius       = 0.0f;
@@ -221,6 +221,8 @@ unsigned int SkiddingAI::getNextSector(unsigned int index)
 void SkiddingAI::update(int ticks)
 {
     float dt = stk_config->ticks2Time(ticks);
+    m_controls->setRescue(false);
+
     // This is used to enable firing an item backwards.
     m_controls->setLookBack(false);
     m_controls->setNitro(false);
@@ -293,7 +295,11 @@ void SkiddingAI::update(int ticks)
     // If the kart needs to be rescued, do it now (and nothing else)
     if(isStuck() && !m_kart->getKartAnimation())
     {
-        new RescueAnimation(m_kart);
+        // For network AI controller
+        if (m_enabled_network_ai)
+            m_controls->setRescue(true);
+        else
+            new RescueAnimation(m_kart);
         AIBaseLapController::update(ticks);
         return;
     }
@@ -310,6 +316,9 @@ void SkiddingAI::update(int ticks)
 
     int num_ai = m_world->getNumKarts() - race_manager->getNumPlayers();
     int position_among_ai = m_kart->getPosition() - m_num_players_ahead;
+    // Karts with boosted AI get a better speed cap value
+    if (m_kart->getBoostAI())
+        position_among_ai = 1;
 
     float speed_cap = m_ai_properties->getSpeedCap(m_distance_to_player,
                                                    position_among_ai,
@@ -322,53 +331,10 @@ void SkiddingAI::update(int ticks)
     checkCrashes(m_kart->getXYZ());
     determineTrackDirection();
 
-    int item_skill = computeSkill(ITEM_SKILL);
-
-    // Special behaviour if we have a bomb attach: try to hit the kart ahead
-    // of us.
-    bool commands_set = false;
-    if(m_ai_properties->m_handle_bomb &&
-        m_kart->getAttachment()->getType()==Attachment::ATTACH_BOMB)
-    {
-       //TODO : add logic to allow an AI kart to pass the bomb to a kart
-       //       close behind by slowing/steering slightly
-       if ( m_kart_ahead != m_kart->getAttachment()->getPreviousOwner())
-       {
-           // Use nitro if the kart is far ahead, or faster than this kart
-           handleNitroAndZipper(item_skill);
-          
-           // If we are close enough, try to hit this kart
-           if(m_distance_ahead<=10)
-           {
-              Vec3 target = m_kart_ahead->getXYZ();
-
-              // If we are faster, try to predict the point where we will hit
-              // the other kart
-              if((m_kart_ahead->getSpeed() < m_kart->getSpeed()) &&
-                  !m_kart_ahead->isGhostKart())
-              {
-                  float time_till_hit = m_distance_ahead
-                                      / (m_kart->getSpeed()-m_kart_ahead->getSpeed());
-                  target += m_kart_ahead->getVelocity()*time_till_hit;
-              }
-              float steer_angle = steerToPoint(target);
-              setSteering(steer_angle, dt);
-              commands_set = true;
-           }
-           handleRescue(dt);
-       }
-    }
-    if(!commands_set)
-    {
-        /*Response handling functions*/
-        handleAcceleration(ticks);
-        handleSteering(dt);
-        handleRescue(dt);
-        handleBraking();
-        // If a bomb is attached, nitro might already be set.
-        if(!m_controls->getNitro())
-            handleNitroAndZipper(item_skill);
-    }
+    /*Response handling functions*/
+    handleAccelerationAndBraking(ticks);
+    handleSteering(dt);
+    handleRescue(dt);
 
     // Make sure that not all AI karts use the zipper at the same
     // time in time trial at start up, so disable it during the 5 first seconds
@@ -383,79 +349,6 @@ void SkiddingAI::update(int ticks)
 }   // update
 
 //-----------------------------------------------------------------------------
-/** This function decides if the AI should brake.
- *  The decision can be based on race mode (e.g. in follow the leader the AI
- *  will brake if it is ahead of the leader). Otherwise it will depend on
- *  the direction the AI is facing (if it's not facing in the track direction
- *  it will brake in order to make it easier to re-align itself), and
- *  estimated curve radius (brake to avoid being pushed out of a curve).
- */
-void SkiddingAI::handleBraking()
-{
-    m_controls->setBrake(false);
-    // In follow the leader mode, the kart should brake if they are ahead of
-    // the leader (and not the leader, i.e. don't have initial position 1)
-    if(race_manager->getMinorMode() == RaceManager::MINOR_MODE_FOLLOW_LEADER &&
-        m_kart->getPosition() < m_world->getKart(0)->getPosition()           &&
-        m_kart->getInitialPosition()>1                                         )
-    {
-#ifdef DEBUG
-    if(m_ai_debug)
-        Log::debug(getControllerName().c_str(), "braking: %s ahead of leader.",
-                   m_kart->getIdent().c_str());
-#endif
-
-        m_controls->setBrake(true);
-        return;
-    }
-
-    // A kart will not brake when the speed is already slower than this
-    // value. This prevents a kart from going too slow (or even backwards)
-    // in tight curves.
-    const float MIN_SPEED = 5.0f;
-
-    // If the kart is not facing roughly in the direction of the track, brake
-    // so that it is easier for the kart to turn in the right direction.
-    if(m_current_track_direction==DriveNode::DIR_UNDEFINED &&
-        m_kart->getSpeed() > MIN_SPEED)
-    {
-#ifdef DEBUG
-        if(m_ai_debug)
-            Log::debug(getControllerName().c_str(),
-                       "%s not aligned with track.",
-                       m_kart->getIdent().c_str());
-#endif
-        m_controls->setBrake(true);
-        return;
-    }
-    if(m_current_track_direction==DriveNode::DIR_LEFT ||
-       m_current_track_direction==DriveNode::DIR_RIGHT   )
-    {
-        float max_turn_speed =
-            m_kart->getSpeedForTurnRadius(m_current_curve_radius);
-
-        if(m_kart->getSpeed() > 1.5f*max_turn_speed  &&
-            m_kart->getSpeed()>MIN_SPEED             &&
-            fabsf(m_controls->getSteer()) > 0.95f          )
-        {
-            m_controls->setBrake(true);
-#ifdef DEBUG
-            if(m_ai_debug)
-                Log::debug(getControllerName().c_str(),
-                           "speed %f too tight curve: radius %f ",
-                           m_kart->getSpeed(),
-                           m_kart->getIdent().c_str(),
-                           m_current_curve_radius);
-#endif
-        }
-        return;
-    }
-
-    return;
-
-}   // handleBraking
-
-//-----------------------------------------------------------------------------
 /** Decides in which direction to steer. If the kart is off track, it will
  *  steer towards the center of the track. Otherwise it will call one of
  *  the findNonCrashingPoint() functions to determine a point to aim for. Then
@@ -466,6 +359,34 @@ void SkiddingAI::handleBraking()
  */
 void SkiddingAI::handleSteering(float dt)
 {
+    // Special behaviour if we have a bomb attached: try to hit the kart ahead
+    // of us.
+    if(m_ai_properties->m_handle_bomb &&
+        m_kart->getAttachment()->getType()==Attachment::ATTACH_BOMB)
+    {
+        //TODO : add logic to allow an AI kart to pass the bomb to a kart
+        //       close behind by slowing/steering slightly
+        // If we are close enough and can pass the bomb, try to hit this kart
+        if ( m_kart_ahead != m_kart->getAttachment()->getPreviousOwner() &&
+            m_distance_ahead<=10)
+        {
+            Vec3 target = m_kart_ahead->getXYZ();
+
+            // If we are faster, try to predict the point where we will hit
+            // the other kart
+            if((m_kart_ahead->getSpeed() < m_kart->getSpeed()) &&
+                !m_kart_ahead->isGhostKart())
+            {
+                float time_till_hit = m_distance_ahead
+                                    / (m_kart->getSpeed()-m_kart_ahead->getSpeed());
+                target += m_kart_ahead->getVelocity()*time_till_hit;
+            }
+            float steer_angle = steerToPoint(target);
+            setSteering(steer_angle, dt);
+            return;
+        }
+    }
+
     const int next = m_next_node_index[m_track_node];
 
     float steer_angle = 0.0f;
@@ -540,8 +461,6 @@ void SkiddingAI::handleSteering(float dt)
 
         switch(m_point_selection_algorithm)
         {
-        case PSA_FIXED : findNonCrashingPointFixed(&aim_point, &last_node);
-                         break;
         case PSA_NEW:    findNonCrashingPointNew(&aim_point, &last_node);
                          break;
         case PSA_DEFAULT:findNonCrashingPoint(&aim_point, &last_node);
@@ -562,7 +481,7 @@ void SkiddingAI::handleSteering(float dt)
 
         // Potentially adjust the point to aim for in order to either
         // aim to collect item, or steer to avoid a bad item.
-        if(m_ai_properties->m_collect_avoid_items)
+        if(m_ai_properties->m_collect_avoid_items && m_kart->getBlockedByPlungerTicks()<=0)
             handleItemCollectionAndAvoidance(&aim_point, last_node);
 
         steer_angle = steerToPoint(aim_point);
@@ -637,8 +556,8 @@ void SkiddingAI::handleItemCollectionAndAvoidance(Vec3 *aim_point,
 
     int node = m_track_node;
     float distance = 0;
-    std::vector<const Item *> items_to_collect;
-    std::vector<const Item *> items_to_avoid;
+    std::vector<const ItemState *> items_to_collect;
+    std::vector<const ItemState *> items_to_avoid;
 
     // 1) Filter and sort all items close by
     // -------------------------------------
@@ -646,8 +565,8 @@ void SkiddingAI::handleItemCollectionAndAvoidance(Vec3 *aim_point,
     while(distance < max_item_lookahead_distance)
     {
         int n_index= DriveGraph::get()->getNode(node)->getIndex();
-        const std::vector<Item *> &items_ahead =
-            ItemManager::get()->getItemsInQuads(n_index);
+        const std::vector<ItemState*> &items_ahead =
+                                  ItemManager::get()->getItemsInQuads(n_index);
         for(unsigned int i=0; i<items_ahead.size(); i++)
         {
             evaluateItems(items_ahead[i],  kart_aim_direction,
@@ -759,7 +678,7 @@ void SkiddingAI::handleItemCollectionAndAvoidance(Vec3 *aim_point,
     // ----------------------------------
     if(items_to_collect.size()>0)
     {
-        const Item *item_to_collect = items_to_collect[0];
+        const ItemState *item_to_collect = items_to_collect[0];
         // Test if we would hit a bad item when aiming at this good item.
         // If so, don't change the aim. In this case it has already been
         // ensured that we won't hit the bad item (otherwise steerToAvoid
@@ -829,8 +748,8 @@ void SkiddingAI::handleItemCollectionAndAvoidance(Vec3 *aim_point,
  *        to be avoided.
  *  \return True if it would hit any of the bad items.
 */
-bool SkiddingAI::hitBadItemWhenAimAt(const Item *item,
-                              const std::vector<const Item *> &items_to_avoid)
+bool SkiddingAI::hitBadItemWhenAimAt(const ItemState *item,
+                          const std::vector<const ItemState *> &items_to_avoid)
 {
     core::line3df to_item(m_kart->getXYZ().toIrrVector(),
                           item->getXYZ().toIrrVector());
@@ -889,7 +808,7 @@ bool SkiddingAI::handleSelectedItem(Vec3 kart_aim_direction, Vec3 *aim_point)
  *         into account).
  *  \return True if steering is necessary to avoid an item.
  */
-bool SkiddingAI::steerToAvoid(const std::vector<const Item *> &items_to_avoid,
+bool SkiddingAI::steerToAvoid(const std::vector<const ItemState *> &items_to_avoid,
                               const core::line3df &line_to_target,
                               Vec3 *aim_point)
 {
@@ -1042,9 +961,9 @@ bool SkiddingAI::steerToAvoid(const std::vector<const Item *> &items_to_avoid,
  *         (NULL if no item was avoided so far).
  *  \param item_to_collect A pointer to a previously selected item to collect.
  */
-void SkiddingAI::evaluateItems(const Item *item, Vec3 kart_aim_direction,
-                               std::vector<const Item *> *items_to_avoid,
-                               std::vector<const Item *> *items_to_collect)
+void SkiddingAI::evaluateItems(const ItemState *item, Vec3 kart_aim_direction,
+                               std::vector<const ItemState *> *items_to_avoid,
+                               std::vector<const ItemState *> *items_to_collect)
 {
     const KartProperties *kp = m_kart->getKartProperties();
 
@@ -1116,7 +1035,7 @@ void SkiddingAI::evaluateItems(const Item *item, Vec3 kart_aim_direction,
 
     // Now insert the item into the sorted list of items to avoid
     // (or to collect). The lists are (for now) sorted by distance
-    std::vector<const Item*> *list;
+    std::vector<const ItemState*> *list;
     if(avoid)
         list = items_to_avoid;
     else
@@ -1147,7 +1066,6 @@ void SkiddingAI::evaluateItems(const Item *item, Vec3 kart_aim_direction,
  *  Level 2 to 5 AI : strategy detailed before each item
  *  Each successive level is overall stronger (5 the strongest, 2 the weakest of
  *  non-random strategies), but two levels may share a strategy for a given item.
- *  (level 5 is not yet used ; meant for SuperTux GP preferred karts or boss races)
  *  \param dt Time step size.
  *  STATE: shield on -> avoid usage of offensive items (with certain tolerance)
  *  STATE: swatter on -> avoid usage of shield
@@ -1230,8 +1148,8 @@ void SkiddingAI::handleItems(const float dt, const Vec3 *aim_point, int last_nod
 
     int node = m_track_node;
     float distance = 0;
-    std::vector<const Item *> items_to_collect;
-    std::vector<const Item *> items_to_avoid;
+    std::vector<const ItemState *> items_to_collect;
+    std::vector<const ItemState *> items_to_avoid;
 
     // 1) Filter and sort all items close by
     // -------------------------------------
@@ -1239,7 +1157,7 @@ void SkiddingAI::handleItems(const float dt, const Vec3 *aim_point, int last_nod
     while(distance < max_item_lookahead_distance)
     {
         int n_index= DriveGraph::get()->getNode(node)->getIndex();
-        const std::vector<Item *> &items_ahead =
+        const std::vector<ItemState *> &items_ahead =
             ItemManager::get()->getItemsInQuads(n_index);
         for(unsigned int i=0; i<items_ahead.size(); i++)
         {
@@ -1365,8 +1283,9 @@ void SkiddingAI::handleItems(const float dt, const Vec3 *aim_point, int last_nod
  *  \param items_to_collect The list of close good items
  *  \param items_to_avoid The list of close bad items
  */
-void SkiddingAI::handleBubblegum(int item_skill, const std::vector<const Item *> &items_to_collect,
-                                               const std::vector<const Item *> &items_to_avoid)
+void SkiddingAI::handleBubblegum(int item_skill,
+                                 const std::vector<const ItemState *> &items_to_collect,
+                                 const std::vector<const ItemState *> &items_to_avoid)
 {
     float shield_radius = m_ai_properties->m_shield_incoming_radius;
 
@@ -1444,7 +1363,7 @@ void SkiddingAI::handleBubblegum(int item_skill, const std::vector<const Item *>
     //if it is a bomb, wait : we may pass it to another kart before the timer runs out
     if (item_skill == 5 && type == Attachment::ATTACH_BOMB)
     {
-        if (m_kart->getAttachment()->getTicksLeft() > 360) //3 seconds
+        if (m_kart->getAttachment()->getTicksLeft() < stk_config->time2Ticks(2))
         {
             m_controls->setFire(true);
             m_controls->setLookBack(false);
@@ -1508,7 +1427,8 @@ void SkiddingAI::handleBubblegum(int item_skill, const std::vector<const Item *>
         if (abs_angle < 0.2f) straight_behind = true;
     }
 
-    if(m_distance_behind < 8.0f && straight_behind   )
+    if(m_distance_behind < 8.0f && straight_behind &&
+       (!ItemManager::get()->areItemsSwitched() || item_skill < 4))
     {
         m_controls->setFire(true);
         m_controls->setLookBack(true);
@@ -1770,7 +1690,7 @@ void SkiddingAI::handleSwatter(int item_skill)
         //if it is a bomb, wait : we may pass it to another kart before the timer runs out
         if (item_skill == 5 && type == Attachment::ATTACH_BOMB)
         {
-            if (m_kart->getAttachment()->getTicksLeft() > 360) //3 seconds
+            if (m_kart->getAttachment()->getTicksLeft() > stk_config->time2Ticks(3))
             {
                 m_controls->setFire(true);
                 m_controls->setLookBack(false);
@@ -1806,8 +1726,9 @@ void SkiddingAI::handleSwatter(int item_skill)
  *  \param items_to_collect The list of close good items
  *  \param items_to_avoid The list of close bad items
  */
-void SkiddingAI::handleSwitch(int item_skill, const std::vector<const Item *> &items_to_collect,
-                                            const std::vector<const Item *> &items_to_avoid)
+void SkiddingAI::handleSwitch(int item_skill,
+                              const std::vector<const ItemState *> &items_to_collect,
+                              const std::vector<const ItemState *> &items_to_avoid)
 {
     // It's extremely unlikely two switches are used close one after another
     if(item_skill == 2)
@@ -1860,13 +1781,12 @@ void SkiddingAI::handleSwitch(int item_skill, const std::vector<const Item *> &i
     else if(item_skill == 5)
     {  
        //First step : identify the best available item
-       int i;
        int bad = 0;
        int good = 0;
 
        //Good will store 1 for nitro, big or small, 2 for item box
        //Big nitro are usually hard to take for the AI
-       for(i=items_to_collect.size()-1; i>=0; i--)
+       for(int i=(int)items_to_collect.size()-1; i>=0; i--)
        {
            if (items_to_collect[i]->getType() == Item::ITEM_BONUS_BOX)
            {
@@ -1881,7 +1801,7 @@ void SkiddingAI::handleSwitch(int item_skill, const std::vector<const Item *> &i
        }
            
        //Bad will store 2 for bananas, 3 for bubble gum
-       for(i=items_to_avoid.size()-1; i>=0; i--)
+       for(int i=(int)items_to_avoid.size()-1; i>=0; i--)
        {
            if (items_to_avoid[i]->getType() == Item::ITEM_BUBBLEGUM)
            {
@@ -1958,7 +1878,7 @@ void SkiddingAI::computeNearestKarts()
     else
         m_kart_behind = NULL;
 
-    m_distance_ahead = m_distance_behind = 9999999.9f;
+    m_distance_leader = m_distance_ahead = m_distance_behind = 9999999.9f;
     float my_dist = m_world->getOverallDistance(m_kart->getWorldKartId());
     if(m_kart_ahead)
     {
@@ -1970,6 +1890,12 @@ void SkiddingAI::computeNearestKarts()
     {
         m_distance_behind = my_dist
             -m_world->getOverallDistance(m_kart_behind->getWorldKartId());
+    }
+    if(race_manager->getMinorMode() == RaceManager::MINOR_MODE_FOLLOW_LEADER &&
+       m_kart->getWorldKartId() != 0)
+    {
+        m_distance_leader = m_world->getOverallDistance(0 /*leader kart ID*/)
+                            -my_dist;
     }
 
     // Compute distance to target player kart
@@ -1998,8 +1924,11 @@ void SkiddingAI::computeNearestKarts()
             m_num_players_ahead++;
     }
 
-    if(ProfileWorld::isProfileMode())
-        target_overall_distance = 999999.9f;   // force best driving
+    // Force best driving when profiling and for FTL leaders
+    if(ProfileWorld::isProfileMode() ||
+       (race_manager->getMinorMode() == RaceManager::MINOR_MODE_FOLLOW_LEADER &&
+        m_kart->getWorldKartId() == 0))
+        target_overall_distance = 999999.9f;
     // In higher difficulties, rubber band towards the first player,
     // if at all (SuperTux has currently no rubber banding at all)
     else if (race_manager->getDifficulty() == RaceManager::DIFFICULTY_HARD ||
@@ -2025,7 +1954,7 @@ void SkiddingAI::computeNearestKarts()
         // The cast truncate the decimals, so it won't go over n-1
         // as the highest possible ideal_target is n
         int target_index = (int) (ideal_target - 0.5f);
-        assert(target_index >= 0 && target_index <= n-1);
+        assert(target_index >= 0 && target_index <= (int)n-1);
         target_overall_distance = overall_distance[target_index];
     }
     // Now convert 'maximum overall distance' to distance to player.
@@ -2033,12 +1962,13 @@ void SkiddingAI::computeNearestKarts()
 }   // computeNearestKarts
 
 //-----------------------------------------------------------------------------
-/** Determines if the AI should accelerate or not.
- *  \param dt Time step size.
+/** Determines if the AI should accelerate or not, and if not if it should brake.
+ *  \param ticks Time step size.
+ * //TODO : make acceleration steering aware
  */
-void SkiddingAI::handleAcceleration(int ticks)
+void SkiddingAI::handleAccelerationAndBraking(int ticks)
 {
-    //Do not accelerate until we have delayed the start enough
+    // Step 0 (start only) : do not accelerate until we have delayed the start enough
     if( m_start_delay > 0 )
     {
         m_start_delay -= ticks;
@@ -2046,30 +1976,147 @@ void SkiddingAI::handleAcceleration(int ticks)
         return;
     }
 
+    // Step 1 : determine the appropriate max speed for the curve we are in
+    //         (this is also calculated in straights, as there is always a
+    //          curve lurking at its end)
+
+    // FIXME - requires fixing of the turn radius bugs
+
+    float max_turn_speed =
+        m_kart->getSpeedForTurnRadius(m_current_curve_radius)*1.5f;
+
+    // A kart will not brake when the speed is already slower than this
+    // value. This prevents a kart from going too slow (or even backwards)
+    // in tight curves.
+    const float MIN_SPEED = 5.0f;
+
+    // Step 2 : handle braking (there are some cases who need braking besides
+    //          a too great speed, like overtaking the leader in FTL)
+    handleBraking(max_turn_speed, MIN_SPEED);
+
     if( m_controls->getBrake())
     {
         m_controls->setAccel(0.0f);
         return;
     }
 
+    // Step 3 : handle nitro and zipper
+
+    // If a bomb is attached, nitro might already be set.
+    // FIXME : the bomb situation should be merged here
+    if(!m_controls->getNitro())
+        handleNitroAndZipper(max_turn_speed);
+
+    // Step 4 : handle plunger effect
+
     if(m_kart->getBlockedByPlungerTicks()>0)
     {
-        if(m_kart->getSpeed() < m_kart->getCurrentMaxSpeed() / 2)
-            m_controls->setAccel(0.05f);
-        else
+        int item_skill = computeSkill(ITEM_SKILL);
+        float accel_threshold = 0.5f;
+
+        if (item_skill == 0)
+            accel_threshold = 0.3f;
+        else if (item_skill == 1)
+            accel_threshold = 0.5f;
+        else if (item_skill == 2)
+            accel_threshold = 0.6f;
+        else if (item_skill == 3)
+            accel_threshold = 0.7f;
+        else if (item_skill == 4)
+            accel_threshold = 0.8f;
+        // The best players, knowing the track, don't slow down with a plunger
+        else if (item_skill == 5)
+            accel_threshold = 1.0f;
+
+        if(m_kart->getSpeed() > m_kart->getCurrentMaxSpeed() * accel_threshold)
             m_controls->setAccel(0.0f);
         return;
     }
 
     m_controls->setAccel(stk_config->m_ai_acceleration);
 
-}   // handleAcceleration
+}   // handleAccelerationAndBraking
+
+
+//-----------------------------------------------------------------------------
+/** This function decides if the AI should brake.
+ *  The decision can be based on race mode (e.g. in follow the leader the AI
+ *  will brake if it is ahead of the leader). Otherwise it will depend on
+ *  the direction the AI is facing (if it's not facing in the track direction
+ *  it will brake in order to make it easier to re-align itself), and
+ *  estimated curve radius (brake to avoid being pushed out of a curve).
+ */
+void SkiddingAI::handleBraking(float max_turn_speed, float min_speed)
+{
+    m_controls->setBrake(false);
+    // In follow the leader mode, the kart should brake if they are ahead of
+    // the leader (and not the leader, i.e. don't have initial position 1)
+    // TODO : if there is still time in the countdown and the leader is faster,
+    //        the AI kart should not slow down too much, to stay closer to the
+    //        leader once overtaken.
+    if(race_manager->getMinorMode() == RaceManager::MINOR_MODE_FOLLOW_LEADER &&
+        m_distance_leader < 2                                                &&
+        m_kart->getInitialPosition()>1                                       &&
+        m_world->getOverallDistance(m_kart->getWorldKartId()) > 0             )
+    {
+#ifdef DEBUG
+    if(m_ai_debug)
+        Log::debug(getControllerName().c_str(), "braking: %s too close of leader.",
+                   m_kart->getIdent().c_str());
+#endif
+
+        m_controls->setBrake(true);
+        return;
+    }
+
+    // If the kart is not facing roughly in the direction of the track, brake
+    // so that it is easier for the kart to turn in the right direction.
+    if(m_current_track_direction==DriveNode::DIR_UNDEFINED &&
+        m_kart->getSpeed() > min_speed)
+    {
+#ifdef DEBUG
+        if(m_ai_debug)
+            Log::debug(getControllerName().c_str(),
+                       "%s not aligned with track.",
+                       m_kart->getIdent().c_str());
+#endif
+        m_controls->setBrake(true);
+        return;
+    }
+    if(m_current_track_direction==DriveNode::DIR_LEFT ||
+       m_current_track_direction==DriveNode::DIR_RIGHT   )
+    {
+        if(m_kart->getSpeed() > max_turn_speed  &&
+            m_kart->getSpeed()>min_speed        &&
+            fabsf(m_controls->getSteer()) > 0.95f )
+        {
+            m_controls->setBrake(true);
+#ifdef DEBUG
+            if(m_ai_debug)
+                Log::debug(getControllerName().c_str(),
+                           "speed %f too tight curve: radius %f ",
+                           m_kart->getSpeed(),
+                           m_kart->getIdent().c_str(),
+                           m_current_curve_radius);
+#endif
+        }
+        return;
+    }
+
+    return;
+
+}   // handleBraking
 
 //-----------------------------------------------------------------------------
 void SkiddingAI::handleRaceStart()
 {
     if( m_start_delay <  0 )
     {
+        if (m_enabled_network_ai)
+        {
+            m_start_delay = 0;
+            return;
+        }
         // Each kart starts at a different, random time, and the time is
         // smaller depending on the difficulty.
         m_start_delay = stk_config->time2Ticks(
@@ -2083,11 +2130,14 @@ void SkiddingAI::handleRaceStart()
                ? 0.0f  : m_ai_properties->m_false_start_probability;
 
         // Now check for a false start. If so, add 1 second penalty time.
-        if(rand() < RAND_MAX * false_start_probability)
+        if (rand() < RAND_MAX * false_start_probability)
         {
             m_start_delay+=stk_config->m_penalty_ticks;
             return;
         }
+        m_kart->setStartupBoost(m_kart->getStartupBoostFromStartTicks(
+            m_start_delay + stk_config->time2Ticks(1.0f)));
+        m_start_delay = 0;
     }
 }   // handleRaceStart
 
@@ -2099,12 +2149,16 @@ void SkiddingAI::handleRescue(const float dt)
 {
     // check if kart is stuck
     if(m_kart->getSpeed()<2.0f && !m_kart->getKartAnimation() &&
-        !m_world->isStartPhase())
+        !m_world->isStartPhase() && m_start_delay == 0)
     {
         m_time_since_stuck += dt;
         if(m_time_since_stuck > 2.0f)
         {
-            new RescueAnimation(m_kart);
+            // For network AI controller
+            if (m_enabled_network_ai)
+                m_controls->setRescue(true);
+            else
+                new RescueAnimation(m_kart);
             m_time_since_stuck=0.0f;
         }   // m_time_since_stuck > 2.0f
     }
@@ -2117,45 +2171,53 @@ void SkiddingAI::handleRescue(const float dt)
 //-----------------------------------------------------------------------------
 /** Decides wether to use nitro and zipper or not.
  */
-void SkiddingAI::handleNitroAndZipper(int item_skill)
+void SkiddingAI::handleNitroAndZipper(float max_safe_speed)
 {
-   int nitro_skill = computeSkill(NITRO_SKILL);
+    int nitro_skill = computeSkill(NITRO_SKILL);
+    int item_skill = computeSkill(ITEM_SKILL);
    
-   //Nitro continue to be advantageous during the fadeout
-   int nitro_ticks = m_kart->getSpeedIncreaseTicksLeft(MaxSpeed::MS_INCREASE_NITRO);
-   float nitro_time = ( stk_config->ticks2Time(nitro_ticks)
+    //Nitro continue to be advantageous during the fadeout
+    int nitro_ticks = m_kart->getSpeedIncreaseTicksLeft(MaxSpeed::MS_INCREASE_NITRO);
+    float nitro_time = ( stk_config->ticks2Time(nitro_ticks)
                        + m_kart->getKartProperties()->getNitroFadeOutTime() );
-   float nitro_max_time = m_kart->getKartProperties()->getNitroDuration()
+    float nitro_max_time = m_kart->getKartProperties()->getNitroDuration()
                          + m_kart->getKartProperties()->getNitroFadeOutTime();
 
-   //Nitro skill 0 : don't use
-   //Nitro skill 1 : don't use if the kart is braking, on the ground, has finished the race, has no nitro,
-   //                has a parachute or an anvil attached, or has a plunger in the face.
-   //                Otherwise, use it immediately
-   //Nitro skill 2 : Don't use nitro if there is more than 1,2 seconds of effect/fadeout left. Use it when at
-   //                max speed or under 5 of speed (after rescue, etc.). Use it to pass bombs.
-   //                Tries to builds a reserve of 4 energy to use towards the end
-   //Nitro skill 3 : Same as level 2, but don't use until 0.5 seconds of effect/fadeout left, and don't use close
-   //                to bad items, and has a target reserve of 8 energy
-   //Nitro skill 4 : Same as level 3, but don't use until 0.05 seconds of effect/fadeout left and ignore the plunger
-   //                and has a target reserve of 12 energy
+    //Nitro skill 0 : don't use
+    //Nitro skill 1 : don't use if the kart is braking, on the ground, has finished the race, has no nitro,
+    //                has a parachute or an anvil attached, or has a plunger in the face.
+    //                Otherwise, use it immediately
+    //Nitro skill 2 : Don't use nitro if there is more than 1,2 seconds of effect/fadeout left. Use it when at
+    //                max speed or under 5 of speed (after rescue, etc.). Use it to pass bombs.
+    //                Tries to builds a reserve of 4 energy to use towards the end
+    //Nitro skill 3 : Same as level 2, but don't use until 0.5 seconds of effect/fadeout left, and don't use close
+    //                to bad items, and has a target reserve of 8 energy
+    //Nitro skill 4 : Same as level 3, but don't use until 0.05 seconds of effect/fadeout left and ignore the plunger
+    //                and has a target reserve of 12 energy
    
     m_controls->setNitro(false);
-   
-   float energy_reserve = 0;
-   
-   if (nitro_skill == 2)
-   {
-      energy_reserve = 4;  
-   }
-   if (nitro_skill == 3)
-   {
-      energy_reserve = 8;  
-   }
-   if (nitro_skill == 4)
-   {
-      energy_reserve = 12;  
-   }
+
+    float energy_reserve = 0;
+
+    if (nitro_skill == 2)
+    {
+        energy_reserve = 4;  
+    }
+    if (nitro_skill == 3)
+    {
+        energy_reserve = 8;  
+    }
+    if (nitro_skill == 4)
+    {
+        energy_reserve = 12;  
+    }
+
+    // No point in building a big nitro reserve in nitro for FTL AIs,
+    // just keep enough to help accelerating after an accident
+    if(race_manager->getMinorMode() == RaceManager::MINOR_MODE_FOLLOW_LEADER)
+    {
+        energy_reserve = std::min(2.0f, energy_reserve);
+    }
    
     // Don't use nitro or zipper if we are braking
     if(m_controls->getBrake()) return;
@@ -2168,18 +2230,27 @@ void SkiddingAI::handleNitroAndZipper(int item_skill)
     {
         if ((nitro_skill < 4) && (item_skill < 5))
         {
-           return;
+            return;
         }
-       else if (nitro_skill < 4)
-       {
-           nitro_skill = 0;  
-       }
-       else if (item_skill < 5)
-       {
-           item_skill = 0;  
-       }
+        else if (nitro_skill < 4)
+        {
+            nitro_skill = 0;  
+        }
+        else if (item_skill < 5)
+        {
+            item_skill = 0;  
+        }
     }
-   
+
+    // Don't use nitro or zipper if it would make the kart go too fast
+
+    if(m_kart->getSpeed() + m_kart->getKartProperties()->getNitroMaxSpeedIncrease() > max_safe_speed)
+        nitro_skill = 0;
+
+    // FIXME : as the zipper can give +15, but only gives +5 instant, this may be too conservative
+    if(m_kart->getSpeed() + m_kart->getKartProperties()->getZipperMaxSpeedIncrease() > max_safe_speed)
+        item_skill = 0;
+
     // If a parachute or anvil is attached, the nitro and zipper don't give much
     // benefit. Better wait till later.
     const bool has_slowdown_attachment =
@@ -2240,6 +2311,10 @@ void SkiddingAI::handleNitroAndZipper(int item_skill)
         // The burster forces the AI to consume its reserve by series of 2 bursts
         // Otherwise the bursting differences of the various nitro skill wouldn't matter here
         // In short races, most AI nitro usage may be at the end with the reserve
+        // FIXME : if there is a lot more nitro than can be used, use it by longer/more frequent bursts
+        // FIXME : waiting for the end of the fade-out for the next burst is not optimal
+        //         as the kart loses nitro top speed time reaccelerating
+        // FIXME : if the nitro reserve goes over 18, use as soon as practical
         float burster;
         
         if ( nitro_time > 0)
@@ -2592,81 +2667,6 @@ void SkiddingAI::findNonCrashingPointNew(Vec3 *result, int *last_node)
 
     *result = DriveGraph::get()->getNode(*last_node)->getCenter();
 }   // findNonCrashingPointNew
-
-//-----------------------------------------------------------------------------
-/** Find the sector that at the longest distance from the kart, that can be
- *  driven to without crashing with the track, then find towards which of
- *  the two edges of the track is closest to the next curve afterwards,
- *  and return the position of that edge.
- *  \param aim_position The point to aim for, i.e. the point that can be
- *         driven to in a straight line.
- *  \param last_node The graph node index in which the aim_position is.
- */
-void SkiddingAI::findNonCrashingPointFixed(Vec3 *aim_position, int *last_node)
-{
-#ifdef AI_DEBUG_KART_HEADING
-    const Vec3 eps(0,0.5f,0);
-    m_curve[CURVE_KART]->clear();
-    m_curve[CURVE_KART]->addPoint(m_kart->getXYZ()+eps);
-    Vec3 forw(0, 0, 50);
-    m_curve[CURVE_KART]->addPoint(m_kart->getTrans()(forw)+eps);
-#endif
-    *last_node = m_next_node_index[m_track_node];
-
-    Vec3 direction;
-    Vec3 step_track_coord;
-
-    // The original while(1) loop is replaced with a for loop to avoid
-    // infinite loops (which we had once or twice). Usually the number
-    // of iterations in the while loop is less than 7.
-    for(unsigned int j=0; j<100; j++)
-    {
-        // target_sector is the sector at the longest distance that we can
-        // drive to without crashing with the track.
-        int target_sector = m_next_node_index[*last_node];
-
-        //direction is a vector from our kart to the sectors we are testing
-        direction = DriveGraph::get()->getNode(target_sector)->getCenter()
-                  - m_kart->getXYZ();
-
-        float len=direction.length();
-        unsigned int steps = (unsigned int)( len / m_kart_length );
-        if( steps < 3 ) steps = 3;
-
-        // That shouldn't happen, but since we had one instance of
-        // STK hanging, add an upper limit here (usually it's at most
-        // 20 steps)
-        if( steps>1000) steps = 1000;
-
-        // Protection against having vel_normal with nan values
-        if(len>0.0f) {
-            direction*= 1.0f/len;
-        }
-
-        Vec3 step_coord;
-        //Test if we crash if we drive towards the target sector
-        for(unsigned int i = 2; i < steps; ++i )
-        {
-            step_coord = m_kart->getXYZ()+direction*m_kart_length * float(i);
-
-            DriveGraph::get()->spatialToTrack(&step_track_coord, step_coord,
-                                             *last_node );
-
-            float distance = fabsf(step_track_coord[0]);
-
-            //If we are outside, the previous node is what we are looking for
-            if ( distance + m_kart_width * 0.5f
-                 > DriveGraph::get()->getNode(*last_node)->getPathWidth()*0.5f )
-            {
-                *aim_position = DriveGraph::get()->getNode(*last_node)
-                                                ->getCenter();
-                return;
-            }
-        }
-        *last_node = target_sector;
-    }   // for i<100
-    *aim_position = DriveGraph::get()->getNode(*last_node)->getCenter();
-}   // findNonCrashingPointFixed
 
 //-----------------------------------------------------------------------------
 /** This is basically the original AI algorithm. It is clearly buggy:
@@ -3071,10 +3071,28 @@ void SkiddingAI::setSteering(float angle, float dt)
     else if(steer_fraction < -1.0f) steer_fraction = -1.0f;
 
     // Restrict steering when a plunger is in the face
+    // The degree of restriction depends on item_skill
+
+    //FIXME : the AI speed estimate in curves don't account for this restriction
     if(m_kart->getBlockedByPlungerTicks()>0)
     {
-        if     (steer_fraction >  0.5f) steer_fraction =  0.5f;
-        else if(steer_fraction < -0.5f) steer_fraction = -0.5f;
+        int item_skill = computeSkill(ITEM_SKILL);
+        float steering_limit = 0.5f;
+        if (item_skill == 0)
+            steering_limit = 0.35f;
+        else if (item_skill == 1)
+            steering_limit = 0.45f;
+        else if (item_skill == 2)
+            steering_limit = 0.55f;
+        else if (item_skill == 3)
+            steering_limit = 0.65f;
+        else if (item_skill == 4)
+            steering_limit = 0.75f;
+        else if (item_skill == 5)
+            steering_limit = 0.9f;
+
+        if     (steer_fraction >  steering_limit) steer_fraction =  steering_limit;
+        else if(steer_fraction < -steering_limit) steer_fraction = -steering_limit;
     }
 
     const Skidding *skidding = m_kart->getSkidding();

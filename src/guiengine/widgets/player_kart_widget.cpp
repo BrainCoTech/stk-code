@@ -272,7 +272,9 @@ PlayerKartWidget::~PlayerKartWidget()
 
     if (m_kart_name->getIrrlichtElement() != NULL)
         m_kart_name->getIrrlichtElement()->remove();
-    getCurrentScreen()->manualRemoveWidget(this);
+        
+    if (getCurrentScreen() != NULL)
+        getCurrentScreen()->manualRemoveWidget(this);
 
 #ifdef DEBUG
     m_magic_number = 0xDEADBEEF;
@@ -741,8 +743,9 @@ const std::string& PlayerKartWidget::getKartInternalName() const
 /** \brief Event callback from ISpinnerConfirmListener */
 EventPropagation PlayerKartWidget::onSpinnerConfirmed()
 {
-    KartSelectionScreen::getRunningInstance()->playerConfirm(m_player_id);
-    return EVENT_BLOCK;
+    //KartSelectionScreen::getRunningInstance()->playerConfirm(m_player_id);
+    //return EVENT_BLOCK;
+    return EVENT_LET;
 }   // onSpinnerConfirmed
 
 // -------------------------------------------------------------------------

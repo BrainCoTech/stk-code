@@ -120,6 +120,14 @@ CGUIEditBox::~CGUIEditBox()
         dl->setIMEEnable(false);
     }
 #endif
+#ifdef ANDROID
+    if (irr_driver->getDevice()->getType() == irr::EIDT_ANDROID)
+    {
+        CIrrDeviceAndroid* dl = dynamic_cast<CIrrDeviceAndroid*>(
+                                                       irr_driver->getDevice());
+        dl->setTextInputEnabled(false);
+    }
+#endif
 #endif
 }
 
@@ -269,10 +277,18 @@ bool CGUIEditBox::OnEvent(const SEvent& event)
                     dl->setIMEEnable(false);
                 }
 #endif
+#ifdef ANDROID
+                if (irr_driver->getDevice()->getType() == irr::EIDT_ANDROID)
+                {
+                    CIrrDeviceAndroid* dl = dynamic_cast<CIrrDeviceAndroid*>(
+                                                       irr_driver->getDevice());
+                    dl->setTextInputEnabled(false);
+                }
+#endif
             }
-#ifdef _IRR_COMPILE_WITH_X11_DEVICE_
             else if (event.GUIEvent.EventType == EGET_ELEMENT_FOCUSED)
             {
+#ifdef _IRR_COMPILE_WITH_X11_DEVICE_
                 if (irr_driver->getDevice()->getType() == irr::EIDT_X11)
                 {
                     CIrrDeviceLinux* dl = dynamic_cast<CIrrDeviceLinux*>(
@@ -280,8 +296,16 @@ bool CGUIEditBox::OnEvent(const SEvent& event)
                     dl->setIMEEnable(true);
                     dl->setIMELocation(calculateICPos());
                 }
-            }
 #endif
+#ifdef ANDROID
+                if (irr_driver->getDevice()->getType() == irr::EIDT_ANDROID)
+                {
+                    CIrrDeviceAndroid* dl = dynamic_cast<CIrrDeviceAndroid*>(
+                                                       irr_driver->getDevice());
+                    dl->setTextInputEnabled(true);
+                }
+#endif
+            }
             break;
 #if defined(_IRR_COMPILE_WITH_WINDOWS_DEVICE_)
         case EET_IMPUT_METHOD_EVENT:
@@ -1262,34 +1286,14 @@ bool CGUIEditBox::processMouse(const SEvent& event)
         }
         else if (!m_rtl)
         {
-            bool use_screen_keyboard = UserConfigParams::m_screen_keyboard;
-            
-            #ifdef ANDROID
-            int32_t keyboard = AConfiguration_getKeyboard(
-                                                    global_android_app->config);
-            
-            if (keyboard == ACONFIGURATION_KEYBOARD_QWERTY)
-            {
-                use_screen_keyboard = false;
-            }
-            #endif
-            
             if (!AbsoluteClippingRect.isPointInside(
                 core::position2d<s32>(event.MouseInput.X, event.MouseInput.Y)))
             {
                 return false;
             }
-            else if (use_screen_keyboard)
+            else if (GUIEngine::ScreenKeyboard::shouldUseScreenKeyboard())
             {
-                CursorPos = Text.size();
-                setTextMarkers(CursorPos, CursorPos);
-                calculateScrollPos();
-
-                if (GUIEngine::ScreenKeyboard::getCurrent() == NULL)
-                {
-                    new GUIEngine::ScreenKeyboard(0.98f, 0.30f, this);
-                }
-
+                openScreenKeyboard();
                 return true;
             }
             else
@@ -1748,5 +1752,17 @@ void CGUIEditBox::deserializeAttributes(io::IAttributes* in, io::SAttributeReadW
             (EGUI_ALIGNMENT) in->getAttributeAsEnumeration("VTextAlign", GUIAlignmentNames));
 
     // setOverrideFont(in->getAttributeAsFont("OverrideFont"));
+}
+
+void CGUIEditBox::openScreenKeyboard()
+{
+    if (GUIEngine::ScreenKeyboard::getCurrent() != NULL)
+        return;
+        
+    CursorPos = Text.size();
+    setTextMarkers(CursorPos, CursorPos);
+    calculateScrollPos();
+
+    new GUIEngine::ScreenKeyboard(0.98f, 0.30f, this);
 }
 

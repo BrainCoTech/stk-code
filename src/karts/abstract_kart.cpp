@@ -72,8 +72,11 @@ AbstractKart::AbstractKart(const std::string& ident,
 AbstractKart::~AbstractKart()
 {
     delete m_kart_model;
-    if(m_kart_animation)
+    if (m_kart_animation)
+    {
+        m_kart_animation->handleResetRace();
         delete m_kart_animation;
+    }
 }   // ~AbstractKart
 
 // ----------------------------------------------------------------------------
@@ -82,8 +85,9 @@ void AbstractKart::reset()
     // important to delete animations before calling reset, as some animations
     // set the kart velocity in their destructor (e.g. cannon) which "reset"
     // can then cancel. See #2738
-    if(m_kart_animation)
+    if (m_kart_animation)
     {
+        m_kart_animation->handleResetRace();
         delete m_kart_animation;
         m_kart_animation = NULL;
     }
@@ -144,19 +148,33 @@ void AbstractKart::setKartAnimation(AbstractKartAnimation *ka)
 }   // setKartAnimation
 
 // ----------------------------------------------------------------------------
-/** Moves the current physical transform into this kart's position.
- */
-void AbstractKart::kartIsInRestNow()
-{
-    // Update the kart transforms with the newly computed position
-    // after all karts are reset
-    setTrans(getBody()->getWorldTransform());
-}   // kartIsInRest
-
-// ----------------------------------------------------------------------------
 /** Returns the time at which the kart was at a given distance.
  * Returns -1.0f if none */
 float AbstractKart::getTimeForDistance(float distance)
 {
     return -1.0f;
 }   // getTimeForDistance
+
+// ----------------------------------------------------------------------------
+/** Moves the current physical transform into this kart's position.
+ */
+void AbstractKart::kartIsInRestNow()
+{
+    // Update the kart transforms with the newly computed position
+    // after all karts are reset
+    m_starting_transform = getBody()->getWorldTransform();
+    setTrans(m_starting_transform);
+}   // kartIsInRest
+
+// ------------------------------------------------------------------------
+/** Called before go phase to make sure all karts start at the same
+ *  position in case there is a slope. */
+void AbstractKart::makeKartRest()
+{
+    btRigidBody *body = getBody();
+    body->clearForces();
+    body->setLinearVelocity(Vec3(0.0f));
+    body->setAngularVelocity(Vec3(0.0f));
+    body->proceedToTransform(m_starting_transform);
+    setTrans(m_starting_transform);
+}   // makeKartRest

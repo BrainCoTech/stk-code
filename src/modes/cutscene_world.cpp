@@ -17,6 +17,7 @@
 
 #include "modes/cutscene_world.hpp"
 
+#include "main_loop.hpp"
 #include "animations/animation_base.hpp"
 #include "animations/three_d_animation.hpp"
 #include "audio/sfx_manager.hpp"
@@ -56,7 +57,8 @@ CutsceneWorld::CutsceneWorld() : World()
 {
     m_time_at_second_reset = 0.0f;
     m_aborted = false;
-    WorldStatus::setClockMode(CLOCK_NONE);
+    WorldStatus::setClockMode(CLOCK_CHRONO);
+    m_phase = RACE_PHASE;
     m_use_highscores = false;
     m_play_track_intro_sound = false;
     m_play_ready_set_go_sounds = false;
@@ -70,6 +72,9 @@ CutsceneWorld::CutsceneWorld() : World()
  */
 void CutsceneWorld::init()
 {
+    // Use real dt even if fps is low. It allows to keep everything synchronized
+    main_loop->setAllowLargeDt(true);
+    
     m_second_reset = false;
     World::init();
 
@@ -169,8 +174,14 @@ void CutsceneWorld::init()
  */
 CutsceneWorld::~CutsceneWorld()
 {
+    main_loop->setAllowLargeDt(false);
 }   // ~CutsceneWorld
-
+//-----------------------------------------------------------------------------
+void CutsceneWorld::reset(bool restart)
+{
+    World::reset(restart);
+    m_phase = RACE_PHASE;
+}
 //-----------------------------------------------------------------------------
 /** Returns the internal identifier for this race.
  */
@@ -199,6 +210,8 @@ void CutsceneWorld::update(int ticks)
     if (m_time < 0.0001f)
     {
         //printf("INITIAL TIME for CutsceneWorld\n");
+
+        music_manager->startMusic();
 
         PtrVector<TrackObject>& objects = Track::getCurrentTrack()
                                         ->getTrackObjectManager()->getObjects();
@@ -231,7 +244,6 @@ void CutsceneWorld::update(int ticks)
     {
         // this way of calculating time and dt is more in line with what
         // irrlicht does and provides better synchronisation
-        double prev_time = m_time;
         double now = StkTime::getRealTime();
         m_time = now - m_time_at_second_reset;
     }

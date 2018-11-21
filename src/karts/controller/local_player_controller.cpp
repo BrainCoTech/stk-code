@@ -38,7 +38,9 @@
 #include "karts/rescue_animation.hpp"
 #include "modes/world.hpp"
 #include "network/network_config.hpp"
+#include "network/protocols/game_events_protocol.hpp"
 #include "network/protocols/game_protocol.hpp"
+#include "network/race_event_manager.hpp"
 #include "network/rewind_manager.hpp"
 #include "race/history.hpp"
 #include "states_screens/race_gui_base.hpp"
@@ -59,6 +61,7 @@ LocalPlayerController::LocalPlayerController(AbstractKart *kart,
                                              PerPlayerDifficulty d)
                      : PlayerController(kart), m_sky_particles_emitter(NULL)
 {
+    m_has_started = false;
     m_difficulty = d;
     m_player = StateManager::get()->getActivePlayer(local_player_id);
     if(m_player)
@@ -117,6 +120,7 @@ void LocalPlayerController::reset()
 {
     PlayerController::reset();
     m_sound_schedule = false;
+    m_has_started = false;
 }   // reset
 
 // ----------------------------------------------------------------------------
@@ -150,19 +154,55 @@ void LocalPlayerController::resetInputState()
 bool LocalPlayerController::action(PlayerAction action, int value,
                                    bool dry_run)
 {
+    // Pause race doesn't need to be sent to server
+    if (action == PA_PAUSE_RACE)
+    {
+        PlayerController::action(action, value);
+        return true;
+    }
+
+    if (action == PA_ACCEL && value != 0 && !m_has_started)
+    {
+        m_has_started = true;
+        if (!NetworkConfig::get()->isNetworking())
+        {
+            float f = m_kart->getStartupBoostFromStartTicks(
+                World::getWorld()->getAuxiliaryTicks());
+            m_kart->setStartupBoost(f);
+        }
+        else if (NetworkConfig::get()->isClient())
+        {
+            auto ge = RaceEventManager::getInstance()->getProtocol();
+            assert(ge);
+            ge->sendStartupBoost((uint8_t)m_kart->getWorldKartId());
+        }
+    }
+
+    // Check if skid key is pressed and if turn button is in disagreement
+    // with the current steering dominant, ignore the skid key press, see #3168
+    if (action == PA_DRIFT && value != 0)
+    {
+        if ((!PlayerController::action(PA_STEER_LEFT, 0, /*dry_run*/true) &&
+            m_controls->getSteer() < 0.0f) ||
+            (!PlayerController::action(PA_STEER_RIGHT, 0, /*dry_run*/true) &&
+            m_controls->getSteer() > 0.0f))
+            return false;
+    }
+
     // If this event does not change the control state (e.g.
     // it's a (auto) repeat event), do nothing. This especially
     // optimises traffic to the server and other clients.
-    if (!PlayerController::action(action, value, /*dry_run*/true)) return false;
+    if (!PlayerController::action(action, value, /*dry_run*/true))
+        return false;
 
     // Register event with history
     if(!history->replayHistory())
         history->addEvent(m_kart->getWorldKartId(), action, value);
 
     // If this is a client, send the action to networking layer
-    if (World::getWorld()->isNetworkWorld() && 
-        NetworkConfig::get()->isClient()    &&
-        !RewindManager::get()->isRewinding()   )
+    if (NetworkConfig::get()->isNetworking() &&
+        NetworkConfig::get()->isClient() &&
+        !RewindManager::get()->isRewinding())
     {
         if (auto gp = GameProtocol::lock())
         {
@@ -260,13 +300,14 @@ void LocalPlayerController::update(int ticks)
  */
 void LocalPlayerController::displayPenaltyWarning()
 {
+    PlayerController::displayPenaltyWarning();
     RaceGUIBase* m=World::getWorld()->getRaceGUI();
     if (m)
     {
         m->addMessage(_("Penalty time!!"), m_kart, 2.0f,
                       GUIEngine::getSkin()->getColor("font::top"), true /* important */,
             false /*  big font */, true /* outline */);
-        m->addMessage(_("Don't accelerate before go"), m_kart, 2.0f,
+        m->addMessage(_("Don't accelerate before 'Set!'"), m_kart, 2.0f,
             GUIEngine::getSkin()->getColor("font::normal"), true /* important */,
             false /*  big font */, true /* outline */);
     }
@@ -305,7 +346,7 @@ void LocalPlayerController::setPosition(int p)
  d*/
 void LocalPlayerController::finishedRace(float time)
 {
-    // This will implicitely trigger setting the first end camera to be active
+    // This will implicitly trigger setting the first end camera to be active
     Camera::changeCamera(m_camera_index, Camera::CM_TYPE_END);
 }   // finishedRace
 
@@ -393,7 +434,8 @@ void LocalPlayerController::nitroNotFullSound()
  */
 bool LocalPlayerController::canGetAchievements() const 
 {
-    return m_player->getConstProfile() == PlayerManager::getCurrentPlayer();
+    return !RewindManager::get()->isRewinding() &&
+        m_player->getConstProfile() == PlayerManager::getCurrentPlayer();
 }   // canGetAchievements
 
 // ----------------------------------------------------------------------------

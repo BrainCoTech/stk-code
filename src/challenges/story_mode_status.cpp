@@ -45,7 +45,6 @@ StoryModeStatus::StoryModeStatus(const XMLNode *node)
     {
         node->get("first-time", &m_first_time);
     }   // if node
-
 }   // StoryModeStatus
 
 //-----------------------------------------------------------------------------
@@ -71,14 +70,14 @@ void StoryModeStatus::addStatus(ChallengeStatus *cs)
 //-----------------------------------------------------------------------------
 bool StoryModeStatus::isLocked(const std::string& feature)
 {
-    if (UserConfigParams::m_everything_unlocked)
+    if (UserConfigParams::m_unlock_everything > 0)
         return false;
 
     return m_locked_features.find(feature)!=m_locked_features.end();
 }  // featureIsLocked
 
 //-----------------------------------------------------------------------------
-void StoryModeStatus::computeActive()
+void StoryModeStatus::computeActive(bool first_call)
 {
     int old_points = m_points;
     m_points = 0;
@@ -98,8 +97,8 @@ void StoryModeStatus::computeActive()
         // -----------------
         if((i->second)->isSolvedAtAnyDifficulty())
         {
-            // The constructor calls computeActive, which actually locks
-            // all features, so unlock the solved ones (and don't try to
+            // computeActive is called in createStoryModeStatus, which actually
+            // locks all features, so unlock the solved ones (and don't try to
             // save the state, since we are currently reading it)
 
             if (i->second->isSolved(RaceManager::DIFFICULTY_EASY))
@@ -184,8 +183,10 @@ void StoryModeStatus::computeActive()
 
     // now we have the number of points.
 
+    // Update the previous number of points
+    // On game launch, set it to the number of points the player has
     if (old_points != m_points)
-        m_points_before = old_points;
+        m_points_before = (first_call) ? m_points : old_points;
 
     unlockFeatureByList();
 
@@ -222,6 +223,7 @@ void StoryModeStatus::unlockFeatureByList()
                 continue;
 
             bool newly_solved = unlock_manager->unlockByPoints(m_points,i->second);
+            newly_solved = newly_solved || unlock_manager->unlockSpecial(i->second, getNumReqMetInLowerDiff());
 
             // Add to list of recently unlocked features
             if(newly_solved)
@@ -273,8 +275,9 @@ void StoryModeStatus::unlockFeature(ChallengeStatus* c, RaceManager::Difficulty 
         m_locked_features.erase(p);
     }
 
-    // Add to list of recently unlocked features if the challenge is newly completed
-    if (!c->isSolvedAtAnyDifficulty())
+    // Add to list of recently unlocked features
+    // if the challenge is newly completed at the current difficulty
+    if (!c->isSolved(d))
         m_unlocked_features.push_back(c->getData());
 
     c->setSolved(d);  // reset isActive flag
@@ -299,6 +302,14 @@ void StoryModeStatus::setCurrentChallenge(const std::string &challenge_id)
  */
 void StoryModeStatus::raceFinished()
 {
+    if(m_current_challenge                                            &&
+        race_manager->getDifficulty() != RaceManager::DIFFICULTY_BEST &&
+        m_current_challenge->getData()->isChallengeFulfilled(true /*best*/))
+    {
+        ChallengeStatus* c = const_cast<ChallengeStatus*>(m_current_challenge);
+        c->setMaxReqInLowerDiff();
+    }
+
     if(m_current_challenge                                           &&
         m_current_challenge->isActive(race_manager->getDifficulty()) &&
         m_current_challenge->getData()->isChallengeFulfilled()           )
@@ -370,3 +381,15 @@ void StoryModeStatus::save(UTFWriter &out)
     }
     out << "      </story-mode>\n";
 }  // save
+
+int StoryModeStatus::getNumReqMetInLowerDiff() const
+{
+    int counter = 0;
+    for ( const auto &c : m_challenges_state)
+    {
+        counter += (c.second->areMaxReqMetInLowerDiff()) ? 1 : 0;
+    }
+    return counter;
+}  // getNumReqMetInLowerDiff
+
+/* EOF */

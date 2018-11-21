@@ -63,9 +63,9 @@ void WorldWithRank::init()
 }   // init
 
 //-----------------------------------------------------------------------------
-void WorldWithRank::reset()
+void WorldWithRank::reset(bool restart)
 {
-    World::reset();
+    World::reset(restart);
     for (unsigned int i = 0; i < m_kart_track_sector.size(); i++)
     {
         getTrackSector(i)->reset();
@@ -82,7 +82,7 @@ AbstractKart* WorldWithRank::getKartAtPosition(unsigned int p) const
     if(p<1 || p>m_position_index.size())
         return NULL;
 
-    return m_karts[m_position_index[p-1]];
+    return m_karts[m_position_index[p-1]].get();
 }   // getKartAtPosition
 
 //-----------------------------------------------------------------------------

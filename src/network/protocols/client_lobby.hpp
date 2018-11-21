@@ -1,3 +1,21 @@
+//
+//  SuperTuxKart - a fun racing game with go-kart
+//  Copyright (C) 2018 SuperTuxKart-Team
+//
+//  This program is free software; you can redistribute it and/or
+//  modify it under the terms of the GNU General Public License
+//  as published by the Free Software Foundation; either version 3
+//  of the License, or (at your option) any later version.
+//
+//  This program is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//  GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License
+//  along with this program; if not, write to the Free Software
+//  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+
 #ifndef CLIENT_LOBBY_HPP
 #define CLIENT_LOBBY_HPP
 
@@ -6,8 +24,11 @@
 #include "utils/cpp2011.hpp"
 
 #include <atomic>
+#include <map>
 #include <memory>
 #include <set>
+
+enum PeerDisconnectInfo : unsigned int;
 
 class BareNetworkString;
 class Server;
@@ -27,9 +48,9 @@ private:
     void updatePlayerList(Event* event);
     void handleChat(Event* event);
     void handleServerInfo(Event* event);
+    void handleBadTeam();
+    void handleBadConnection();
     void becomingServerOwner();
-
-    void clearPlayers();
 
     TransportAddress m_server_address;
 
@@ -42,11 +63,21 @@ private:
         REQUESTING_CONNECTION,
         CONNECTED,              // means in the lobby room
         SELECTING_ASSETS,       // in the kart selection or tracks screen
-        PLAYING,                // racing
+        RACING,                 // racing
         RACE_FINISHED,          // race result shown
         DONE,
         EXITING
     };
+
+    bool m_waiting_for_game;
+
+    bool m_server_auto_game_time;
+
+    bool m_received_server_result;
+
+    bool m_auto_started;
+
+    uint64_t m_auto_back_to_lobby_time;
 
     /** The state of the finite state machine. */
     std::atomic<ClientState> m_state;
@@ -54,11 +85,13 @@ private:
     std::set<std::string> m_available_karts;
     std::set<std::string> m_available_tracks;
 
-    bool m_received_server_result = false;
-
     void addAllPlayers(Event* event);
     void finalizeConnectionRequest(NetworkString* header,
                                    BareNetworkString* rest, bool encrypt);
+
+    std::map<PeerDisconnectInfo, irr::core::stringw> m_disconnected_msg;
+
+    irr::core::stringw m_total_players;
 
 public:
              ClientLobby(const TransportAddress& a, std::shared_ptr<Server> s);
@@ -75,13 +108,16 @@ public:
     virtual void finishedLoadingWorld() OVERRIDE;
     virtual void setup() OVERRIDE;
     virtual void update(int ticks) OVERRIDE;
-    virtual bool waitingForPlayers() const OVERRIDE
-                                        { return m_state.load() == CONNECTED; }
     virtual void asynchronousUpdate() OVERRIDE {}
     virtual bool allPlayersReady() const OVERRIDE
-                                          { return m_state.load() >= PLAYING; }
+                                           { return m_state.load() >= RACING; }
     bool waitingForServerRespond() const
                             { return m_state.load() == REQUESTING_CONNECTION; }
+    bool isLobbyReady() const           { return m_state.load() == CONNECTED; }
+    bool isWaitingForGame() const                { return m_waiting_for_game; }
+    bool isServerAutoGameTime() const       { return m_server_auto_game_time; }
+    virtual bool isRacing() const OVERRIDE { return m_state.load() == RACING; }
+    void clearPlayers();
 };
 
 #endif // CLIENT_LOBBY_HPP

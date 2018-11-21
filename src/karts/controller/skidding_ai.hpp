@@ -50,7 +50,7 @@
 
 #include <line3d.h>
 
-class Item;
+class ItemState;
 class LinearWorld;
 class Track;
 
@@ -144,6 +144,12 @@ private:
     /** Distance to the kard behind. */
     float m_distance_behind;
 
+    /** Distance to the leader kart (used only in FTL)
+        If this kart is leader, contains a high value
+        to avoid the leader slowing down */
+    float m_distance_leader;
+
+
     /** The actual start delay used in ticks. */
     int m_start_delay;
 
@@ -172,7 +178,7 @@ private:
     unsigned int m_last_direction_node;
 
     /** If set an item that the AI should aim for. */
-    const Item *m_item_to_collect;
+    const ItemState *m_item_to_collect;
 
     /** True if items to avoid are close by. Used to avoid using zippers
      *  (which would make it more difficult to avoid items). */
@@ -203,7 +209,7 @@ private:
 
     /** The last item selected for collection, for which a probability
      *  was determined. */
-    const Item *m_last_item_random;
+    const ItemState *m_last_item_random;
 
     /** True if m_last_item_random was randomly selected to be collected. */
     bool m_really_collect_item;
@@ -212,19 +218,17 @@ private:
     RandomGenerator m_random_collect_item;
 
     /** \brief Determines the algorithm to use to select the point-to-aim-for
-     *  There are three different Point Selection Algorithms:
+     *  There are two different Point Selection Algorithms:
      *  1. findNonCrashingPoint() is the default (which is actually slightly
      *     buggy, but so far best one after handling of 90 degree turns was
      *     added).
-     *  2. findNonCrashingPointFixed() which fixes the bugs of the default
-     *     algorithm.
-     *  3. findNonCrashingPointNew() A newly designed algorithm, which is
-     *     faster than the standard one, but does not give as good results
-     *     as the 'buggy' one.
+     *  2. findNonCrashingPointNew() A newly designed algorithm, which is
+     *     faster than a fixed version of findNonCrashingPoint, but does not
+     *     give as good results as the 'buggy' one.
      *
      *  So far the default one has by far the best performance, even though
      *  it has bugs. */
-    enum {PSA_DEFAULT, PSA_FIXED, PSA_NEW}
+    enum {PSA_DEFAULT, PSA_NEW}
           m_point_selection_algorithm;
 
 #ifdef AI_DEBUG
@@ -247,36 +251,37 @@ private:
      *specific action (more like, associated with inaction).
      */
     void  handleRaceStart();
-    void  handleAcceleration(int ticks);
+    void  handleAccelerationAndBraking(int ticks);
     void  handleSteering(float dt);
     int   computeSkill(SkillType type);
     void  handleItems(const float dt, const Vec3 *aim_point,
                                 int last_node, int item_skill);
-    void  handleBubblegum(int item_skill, const std::vector<const Item *> &items_to_collect,
-                                        const std::vector<const Item *> &items_to_avoid);
+    void  handleBubblegum(int item_skill,
+                          const std::vector<const ItemState *> &items_to_collect,
+                          const std::vector<const ItemState *> &items_to_avoid);
     void  handleCake(int item_skill);
     void  handleBowling(int item_skill);
     void  handleSwatter(int item_skill);
-    void  handleSwitch(int item_skill, const std::vector<const Item *> &items_to_collect,
-                                     const std::vector<const Item *> &items_to_avoid);
+    void  handleSwitch(int item_skill,
+                       const std::vector<const ItemState *> &items_to_collect,
+                       const std::vector<const ItemState *> &items_to_avoid);
     void  handleRescue(const float dt);
-    void  handleBraking();
-    void  handleNitroAndZipper(int item_skill);
+    void  handleBraking(float max_turn_speed, float min_speed);
+    void  handleNitroAndZipper(float max_safe_speed);
     void  computeNearestKarts();
     void  handleItemCollectionAndAvoidance(Vec3 *aim_point,
                                            int last_node);
     bool  handleSelectedItem(Vec3 kart_aim_direction, Vec3 *aim_point);
-    bool  steerToAvoid(const std::vector<const Item *> &items_to_avoid,
+    bool  steerToAvoid(const std::vector<const ItemState *> &items_to_avoid,
                        const core::line3df &line_to_target,
                        Vec3 *aim_point);
-    bool  hitBadItemWhenAimAt(const Item *item,
-                              const std::vector<const Item *> &items_to_avoid);
-    void  evaluateItems(const Item *item, Vec3 kart_aim_direction,
-                        std::vector<const Item *> *items_to_avoid,
-                        std::vector<const Item *> *items_to_collect);
+    bool  hitBadItemWhenAimAt(const ItemState *item,
+                              const std::vector<const ItemState *> &items_to_avoid);
+    void  evaluateItems(const ItemState *item, Vec3 kart_aim_direction,
+                        std::vector<const ItemState *> *items_to_avoid,
+                        std::vector<const ItemState *> *items_to_collect);
 
     void  checkCrashes(const Vec3& pos);
-    void  findNonCrashingPointFixed(Vec3 *result, int *last_node);
     void  findNonCrashingPointNew(Vec3 *result, int *last_node);
     void  findNonCrashingPoint(Vec3 *result, int *last_node);
 

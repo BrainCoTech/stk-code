@@ -79,7 +79,10 @@ public:
                              const Vec3 &start_left, const Vec3 &start_right,
                              const Vec3 &end_left, const Vec3 &end_right);
              virtual ~CannonAnimation();
-    virtual void  update(float dt);
-
+    virtual void  update(int ticks);
+    // ------------------------------------------------------------------------
+    virtual bool usePredefinedEndTransform() const            { return false; }
+    // ------------------------------------------------------------------------
+    virtual KartAnimationType getAnimationType() const   { return KAT_CANNON; }
 };   // CannonAnimation
 #endif

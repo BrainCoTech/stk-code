@@ -26,8 +26,10 @@
 #include "utils/cpp2011.hpp"
 #include "utils/singleton.hpp"
 
+#include <cstdlib>
 #include <map>
 #include <vector>
+#include <tuple>
 
 class BareNetworkString;
 class NetworkString;
@@ -74,19 +76,42 @@ private:
     void handleItemEventConfirmation(Event *event);
     static std::weak_ptr<GameProtocol> m_game_protocol;
     std::map<STKPeer*, int> m_initial_ticks;
-
+    std::map<STKPeer*, double> m_last_adjustments;
+    // Maximum value of values are only 32768
+    std::tuple<uint8_t, uint16_t, uint16_t, uint16_t>
+                                                compressAction(const Action& a)
+    {
+        uint8_t w = (uint8_t)(a.m_action & 63) |
+            (a.m_value_l > 0 ? 64 : 0) | (a.m_value_r > 0 ? 128 : 0);
+        uint16_t x = (uint16_t)a.m_value;
+        uint16_t y = (uint16_t)std::abs(a.m_value_l);
+        uint16_t z = (uint16_t)std::abs(a.m_value_r);
+        return std::make_tuple(w, x, y, z);
+    }
+    std::tuple<PlayerAction, int, int, int>
+               decompressAction(uint8_t w, uint16_t x, uint16_t y , uint16_t z)
+    {
+        PlayerAction a = (PlayerAction)(w & 63);
+        int l_sign = ((w >> 6) & 1) != 0 ? 1 : -1;
+        int r_sign = ((w >> 7) & 1) != 0 ? 1 : -1;
+        int b = x;
+        int c = y * l_sign;
+        int d = z * r_sign;
+        return std::make_tuple(a, b, c, d);
+    }
 public:
              GameProtocol();
     virtual ~GameProtocol();
 
     virtual bool notifyEventAsynchronous(Event* event) OVERRIDE;
-    virtual void update(int ticks) OVERRIDE;
-
+    virtual void update(int ticks) OVERRIDE {}
+    void sendActions();
     void controllerAction(int kart_id, PlayerAction action,
                           int value, int val_l, int val_r);
-    void startNewState(bool local_save);
+    void startNewState();
     void addState(BareNetworkString *buffer);
     void sendState();
+    void finalizeState(std::vector<std::string>& cur_rewinder);
     void adjustTimeForClient(STKPeer *peer, int ticks);
     void sendItemEventConfirmation(int ticks);
 

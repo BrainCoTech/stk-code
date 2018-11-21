@@ -50,6 +50,7 @@ class RenderInfo;
 class SFXBuffer;
 class Skidding;
 class SlipStream;
+class Stars;
 class TerrainInfo;
 
 
@@ -74,7 +75,7 @@ private:
     /** Index of kart in world. */
     unsigned int m_world_kart_id;
 
-
+    btTransform m_starting_transform;
 protected:
     /** The kart properties. */
     std::unique_ptr<KartProperties> m_kart_properties;
@@ -112,7 +113,7 @@ public:
     // Functions related to controlling the kart
     // ------------------------------------------------------------------------
     /** Returns the current steering value for this kart. */
-    float getSteerPercent() const { return m_controls.getSteer();  }
+    virtual float getSteerPercent() const { return m_controls.getSteer(); }
     // ------------------------------------------------------------------------
     /** Returns all controls of this kart. */
     KartControl&  getControls() { return m_controls; }
@@ -140,7 +141,7 @@ public:
     // ------------------------------------------------------------------------
     /** Returns a unique identifier for this kart (name of the directory the
      *  kart was loaded from). */
-    const std::string& getIdent() const;
+    virtual const std::string& getIdent() const;
     // ------------------------------------------------------------------------
     /** Returns the maximum steering angle for this kart, which depends on the
      *  speed. */
@@ -270,18 +271,18 @@ public:
     // ------------------------------------------------------------------------
     /** Squashes this kart: it will scale the kart in up direction, and causes
      *  a slowdown while this kart is squashed.
+     *  Returns true if the squash is successful, false otherwise.
      *  \param time How long the kart will be squashed.
      *  \param slowdown Reduction of max speed.    */
-    virtual void setSquash(float time, float slowdown) = 0;
+    virtual bool setSquash(float time, float slowdown) = 0;
+    // ------------------------------------------------------------------------
+    /** Makes the kart unsquashed again. */
+    virtual void unsetSquash() = 0;
     // ------------------------------------------------------------------------
     /** Returns the speed of the kart in meters/second. This is not declared
      *  pure abstract, since this function is not needed for certain classes,
      *  like Ghost. */
     virtual float getSpeed() const = 0;
-    // ------------------------------------------------------------------------
-    /** Returns the exponentially smoothened speed of the kart in 
-     *  which is removes shaking from camera. */
-    virtual float getSmoothedSpeed() const = 0;
     // ------------------------------------------------------------------------
     /** Returns the current maximum speed for this kart, this includes all
      *  bonus and maluses that are currently applied. */
@@ -434,10 +435,6 @@ public:
      *  over. */
     virtual void startEngineSFX() = 0;
     // ------------------------------------------------------------------------
-    /** This method is to be called every time the mass of the kart is updated,
-     *  which includes attaching an anvil to the kart (and detaching). */
-    virtual void updateWeight() = 0;
-    // ------------------------------------------------------------------------
     /** Multiplies the velocity of the kart by a factor f (both linear
      *  and angular). This is used by anvils, which suddenly slow down the kart
      *  when they are attached. */
@@ -517,6 +514,16 @@ public:
     virtual void playSound(SFXBuffer* buffer) = 0;
     // ------------------------------------------------------------------------
     virtual bool isVisible() = 0;
+    // ------------------------------------------------------------------------
+    virtual void makeKartRest();
+    // ------------------------------------------------------------------------
+    virtual void setStartupBoost(float val) = 0;
+    // ------------------------------------------------------------------------
+    virtual float getStartupBoost() const = 0;
+    // ------------------------------------------------------------------------
+    virtual float getStartupBoostFromStartTicks(int ticks) const = 0;
+    // ------------------------------------------------------------------------
+    virtual Stars* getStarsEffect() const = 0;
 };   // AbstractKart
 
 

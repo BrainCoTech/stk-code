@@ -99,7 +99,8 @@ namespace GUIEngine
 
  \n
  \subsection widget1 WTYPE_RIBBON
- <em> Names in XML files: </em> \c "ribbon", \c "buttonbar", \c "tabs"
+ <em> Names in XML files: </em> \c "ribbon", \c "buttonbar", \c "tabs",
+ \c"vertical-tabs"
 
  Appears as an horizontal bar containing elements laid in a row, each being
  and icon and/or a label
@@ -351,9 +352,9 @@ namespace GUIEngine
  size (parent size means the parent \<div\> or the whole screen if none). A
  negative value can also be passed to start coordinate from right and/or
  bottom, instead of starting from top-left corner as usual.
- Note that in many cases, it is not necessary to manually a position. Div
+ Note that in many cases, it is not necessary to manually set a position. Div
  layouts will often manage that for you (see PROP_LAYOUT). Other widgets will
- also automativally manage the position and size of their children, for
+ also automatically manage the position and size of their children, for
  instance ribbons.
 
  \n
@@ -367,7 +368,7 @@ namespace GUIEngine
  Note that in many cases, it is not necessary to manually a size. Div layouts
  will often manage that for you (see PROP_LAYOUT). In addition, sizes are
  automatically calculated for widgets made of icons and/or text like labels
- and plain icons. Other widgets will also automativally manage the position
+ and plain icons. Other widgets will also automatically manage the position
  and size of their children, for instance ribbons.
 
  Another possible value is "fit", which will make a \<div\> fit to its
@@ -973,21 +974,39 @@ namespace GUIEngine
         if (ScreenKeyboard::isActive()) ScreenKeyboard::dismiss();
         if (ModalDialog::isADialogActive()) ModalDialog::dismiss();
 
-        //delete g_font;
-        g_font->drop();
-        g_font = NULL;
-        //delete g_title_font;
-        g_title_font->drop();
-        g_title_font = NULL;
-        //delete g_small_font;
-        g_small_font->drop();
-        g_small_font = NULL;
-        g_large_font->drop();
-        g_large_font = NULL;
-        g_digit_font->drop();
-        g_digit_font = NULL;
-        g_outline_font->drop();
-        g_outline_font = NULL;
+        if (g_font)
+        {
+            //delete g_font;
+            g_font->drop();
+            g_font = NULL;
+        }
+        if (g_title_font)
+        {
+            //delete g_title_font;
+            g_title_font->drop();
+            g_title_font = NULL;
+        }
+        if (g_small_font)
+        {
+            //delete g_small_font;
+            g_small_font->drop();
+            g_small_font = NULL;
+        }
+        if (g_large_font)
+        {
+            g_large_font->drop();
+            g_large_font = NULL;
+        }
+        if (g_digit_font)
+        {
+            g_digit_font->drop();
+            g_digit_font = NULL;
+        }
+        if (g_outline_font)
+        {
+            g_outline_font->drop();
+            g_outline_font = NULL;
+        }
 
         // nothing else to delete for now AFAIK, irrlicht will automatically
         // kill everything along the device
@@ -1275,7 +1294,7 @@ namespace GUIEngine
 
         g_skin->drawBgImage();
         ITexture* loading =
-            irr_driver->getTexture(file_manager->getAsset(FileManager::GUI,
+            irr_driver->getTexture(file_manager->getAsset(FileManager::GUI_ICON,
                                                           "loading.png"));
 
         if(!loading)

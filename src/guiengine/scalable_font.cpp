@@ -56,11 +56,27 @@ void ScalableFont::setShadow(const irr::video::SColor &col)
 void ScalableFont::disableShadow()
 {
     m_font_settings->setShadow(false);
-}   // setShadow
+}   // disableShadow
 // ----------------------------------------------------------------------------
 void ScalableFont::setBlackBorder(bool enabled)
 {
     m_font_settings->setBlackBorder(enabled);
+}   // setBlackBorder
+// ----------------------------------------------------------------------------
+void ScalableFont::setColoredBorder(const irr::video::SColor &col)
+{
+    m_font_settings->setColoredBorder(true);
+    m_font_settings->setBorderColor(col);
+}   // setColoredBorder
+// ----------------------------------------------------------------------------
+void ScalableFont::setThinBorder(bool thin)
+{
+    m_font_settings->setThinBorder(thin);
+}   // setThinBorder
+// ----------------------------------------------------------------------------
+void ScalableFont::disableColoredBorder()
+{
+    m_font_settings->setColoredBorder(false);
 }   // setShadow
 
 // ----------------------------------------------------------------------------
@@ -87,8 +103,10 @@ void ScalableFont::draw(const core::stringw& text,
                         bool hcenter, bool vcenter,
                         const core::rect<s32>* clip)
 {
+#ifndef SERVER_ONLY
     m_face->render(text, position, color, hcenter, vcenter, clip,
         m_font_settings);
+#endif
 }   // draw
 
 // ----------------------------------------------------------------------------
@@ -98,7 +116,6 @@ void ScalableFont::draw(const core::stringw& text,
                         const core::rect<s32>* clip, bool ignoreRTL)
 {
 #ifndef SERVER_ONLY
-
     bool previousRTL = m_font_settings->isRTL();
     if (ignoreRTL)
         m_font_settings->setRTL(false);

@@ -22,6 +22,7 @@
 #include "utils/no_copy.hpp"
 #include "utils/vec3.hpp"
 
+#include <cinttypes>
 #include <memory>
 
 namespace SP
@@ -38,18 +39,22 @@ class Plunger;
  */
 class RubberBand : public NoCopy
 {
+public:
+enum RubberBandTo
+{
+    RB_TO_PLUNGER = 0, /**< Rubber band is attached to plunger.    */
+    RB_TO_KART,        /**< Rubber band is attached to a kart hit. */
+    RB_TO_TRACK        /**< Rubber band is attached to track.      */
+};
 private:
-    enum {RB_TO_PLUNGER,         /**< Rubber band is attached to plunger.    */
-          RB_TO_KART,            /**< Rubber band is attached to a kart hit. */
-          RB_TO_TRACK}           /**< Rubber band is attached to track.      */
-                        m_attached_state;
-
     /** If rubber band is attached to track, the coordinates. */
     Vec3                m_hit_position;
     /** The plunger the rubber band is attached to. */
     Plunger            *m_plunger;
     /** The kart who shot this plunger. */
     AbstractKart       *m_owner;
+
+    RubberBandTo        m_attached_state;
 
     /** The dynamic draw call of the rubber band. */
     std::shared_ptr<SP::SPDynamicDrawCall> m_dy_dc;
@@ -66,7 +71,11 @@ private:
 public:
          RubberBand(Plunger *plunger, AbstractKart *kart);
         ~RubberBand();
+    void updateGraphics(float dt);
     void update(int ticks);
     void hit(AbstractKart *kart_hit, const Vec3 *track_xyz=NULL);
+    uint8_t get8BitState() const;
+    void set8BitState(uint8_t bit_state);
+    void remove();
 };   // RubberBand
 #endif

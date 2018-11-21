@@ -25,6 +25,7 @@
  * Contains generic utility classes for file I/O (especially XML handling).
  */
 
+#include <mutex>
 #include <string>
 #include <vector>
 #include <set>
@@ -59,12 +60,14 @@ public:
      *  The last entry ASSET_COUNT specifies the number of entries. */
     enum AssetType {ASSET_MIN,
                     CHALLENGE=ASSET_MIN,
-                    GFX, GRANDPRIX, GUI, LIBRARY, MODEL, MUSIC, REPLAY,
+                    GFX, GRANDPRIX, GUI_ICON, GUI_SCREEN, GUI_DIALOG,
+                    LIBRARY, MODEL, MUSIC, REPLAY,
                     SCRIPT, SFX, SHADER, SKIN, TEXTURE, TTF,
                     TRANSLATION, ASSET_MAX = TRANSLATION,
                     ASSET_COUNT};
 
 private:
+    mutable std::mutex m_file_system_lock;
 
     /** The names of the various subdirectories of the asset types. */
     std::vector< std::string > m_subdir_name;
@@ -83,6 +86,9 @@ private:
 
     /** Name of stdout file. */
     static std::string m_stdout_filename;
+    
+    /** Directory of stdout file. */
+    static std::string m_stdout_dir;
 
     /** Directory to store screenshots in. */
     std::string       m_screenshot_dir;
@@ -95,6 +101,8 @@ private:
 
     /** Directory where user-defined grand prix are stored. */
     std::string       m_gp_dir;
+
+    std::string       m_cert_location;
 
     std::vector<TextureSearchPath> m_texture_search_path;
 
@@ -111,7 +119,6 @@ private:
                                const;
     void              makePath(std::string& path, const std::string& dir,
                                const std::string& fname) const;
-    bool              checkAndCreateDirectory(const std::string &path);
     io::path          createAbsoluteFilename(const std::string &f);
     void              checkAndCreateConfigDir();
     void              checkAndCreateAddonsDir();
@@ -133,6 +140,7 @@ public:
     void              init();
     static void       addRootDirs(const std::string &roots);
     static void       setStdoutName(const std::string &name);
+    static void       setStdoutDir(const std::string &dir);
     io::IXMLReader   *createXMLReader(const std::string &filename);
     XMLNode          *createXMLTree(const std::string &filename);
     XMLNode          *createXMLTreeFromString(const std::string & content);
@@ -141,6 +149,7 @@ public:
     std::string       getReplayDir() const;
     std::string       getCachedTexturesDir() const;
     std::string       getGPDir() const;
+    bool              checkAndCreateDirectory(const std::string &path);
     bool              checkAndCreateDirectoryP(const std::string &path);
     const std::string &getAddonsDir() const;
     std::string        getAddonsFile(const std::string &name);
@@ -194,7 +203,8 @@ public:
     void       redirectOutput();
 
     bool       fileIsNewer(const std::string& f1, const std::string& f2) const;
-
+    // ------------------------------------------------------------------------
+    const std::string& getUserConfigDir() const   { return m_user_config_dir; }
     // ------------------------------------------------------------------------
     /** Returns the irrlicht file system. */
     irr::io::IFileSystem* getFileSystem() { return m_file_system; }
@@ -220,6 +230,7 @@ public:
     {
         return m_subdir_name[SHADER];
     }
+    const std::string& getCertLocation() const { return m_cert_location; }
 };   // FileManager
 
 extern FileManager* file_manager;

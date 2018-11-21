@@ -70,6 +70,7 @@ namespace irr {
 
 std::vector<std::string> FileManager::m_root_dirs;
 std::string              FileManager::m_stdout_filename = "stdout.log";
+std::string              FileManager::m_stdout_dir;
 
 #ifdef __APPLE__
 // dynamic data path detection onmac
@@ -123,7 +124,9 @@ FileManager::FileManager()
     m_subdir_name[CHALLENGE  ] = "challenges";
     m_subdir_name[GFX        ] = "gfx";
     m_subdir_name[GRANDPRIX  ] = "grandprix";
-    m_subdir_name[GUI        ] = "gui";
+    m_subdir_name[GUI_ICON   ] = "gui/icons";
+    m_subdir_name[GUI_SCREEN ] = "gui/screens";
+    m_subdir_name[GUI_DIALOG ] = "gui/dialogs";
     m_subdir_name[LIBRARY    ] = "library";
     m_subdir_name[MODEL      ] = "models";
     m_subdir_name[MUSIC      ] = "music";
@@ -332,7 +335,7 @@ void FileManager::init()
     if (fileExists(m_subdir_name[TEXTURE]+"deprecated/"))
         pushTextureSearchPath(m_subdir_name[TEXTURE]+"deprecated/", "deprecatedtex");
 
-    pushTextureSearchPath(m_subdir_name[GUI], "gui");
+    pushTextureSearchPath(m_subdir_name[GUI_ICON], "gui/icons");
 
     pushModelSearchPath  (m_subdir_name[MODEL]);
     pushMusicSearchPath  (m_subdir_name[MUSIC]);
@@ -345,6 +348,8 @@ void FileManager::init()
         for(int i=0;i<(int)dirs.size(); i++)
             pushMusicSearchPath(dirs[i]);
     }
+    m_cert_location = m_file_system->getAbsolutePath(
+        getAsset("addons.supertuxkart.net.pem").c_str()).c_str();
 }   // init
 
 //-----------------------------------------------------------------------------
@@ -410,6 +415,7 @@ FileManager::~FileManager()
  */
 bool FileManager::fileExists(const std::string& path) const
 {
+    std::lock_guard<std::mutex> lock(m_file_system_lock);
 #ifdef DEBUG
     bool exists = m_file_system->existFile(path.c_str());
     if(exists) return true;
@@ -512,6 +518,8 @@ io::path FileManager::createAbsoluteFilename(const std::string &f)
  */
 void FileManager::pushModelSearchPath(const std::string& path)
 {
+    std::lock_guard<std::mutex> lock(m_file_system_lock);
+
     m_model_search_path.push_back(path);
     const int n=m_file_system->getFileArchiveCount();
     m_file_system->addFileArchive(createAbsoluteFilename(path),
@@ -539,6 +547,8 @@ void FileManager::pushModelSearchPath(const std::string& path)
  */
 void FileManager::pushTextureSearchPath(const std::string& path, const std::string& container_id)
 {
+    std::lock_guard<std::mutex> lock(m_file_system_lock);
+
     m_texture_search_path.push_back(TextureSearchPath(path, container_id));
     const int n=m_file_system->getFileArchiveCount();
     m_file_system->addFileArchive(createAbsoluteFilename(path),
@@ -566,8 +576,9 @@ void FileManager::pushTextureSearchPath(const std::string& path, const std::stri
  */
 void FileManager::popTextureSearchPath()
 {
-    if(!m_texture_search_path.empty())
+    if (!m_texture_search_path.empty())
     {
+        std::lock_guard<std::mutex> lock(m_file_system_lock);
         TextureSearchPath dir = m_texture_search_path.back();
         m_texture_search_path.pop_back();
         m_file_system->removeFileArchive(createAbsoluteFilename(dir.m_texture_search_path));
@@ -579,8 +590,9 @@ void FileManager::popTextureSearchPath()
  */
 void FileManager::popModelSearchPath()
 {
-    if(!m_model_search_path.empty())
+    if (!m_model_search_path.empty())
     {
+        std::lock_guard<std::mutex> lock(m_file_system_lock);
         std::string dir = m_model_search_path.back();
         m_model_search_path.pop_back();
         m_file_system->removeFileArchive(createAbsoluteFilename(dir));
@@ -811,16 +823,14 @@ bool FileManager::checkAndCreateDirectoryP(const std::string &path)
     for (unsigned int i=0; i<split.size(); i++)
     {
         current_path += split[i] + "/";
-        Log::verbose("[FileManager]", "Checking for: '%s",
-                    current_path.c_str());
-        if (!m_file_system->existFile(io::path(current_path.c_str())))
+        //Log::verbose("[FileManager]", "Checking for: '%s",
+        //            current_path.c_str());
+        
+        if (!checkAndCreateDirectory(current_path))
         {
-            if (!checkAndCreateDirectory(current_path))
-            {
-                Log::error("[FileManager]", "Can't create dir '%s'",
-                        current_path.c_str());
-                break;
-            }
+            Log::error("[FileManager]", "Can't create dir '%s'",
+                    current_path.c_str());
+            break;
         }
     }
     bool error = checkAndCreateDirectory(path);
@@ -920,13 +930,19 @@ void FileManager::checkAndCreateConfigDir()
     if(m_user_config_dir.size()>0 && *m_user_config_dir.rbegin()!='/')
         m_user_config_dir += "/";
 
-    m_user_config_dir +="0.8.2/";
+    m_user_config_dir +="0.10-git/";
     if(!checkAndCreateDirectoryP(m_user_config_dir))
     {
         Log::warn("FileManager", "Can not  create config dir '%s', "
                   "falling back to '.'.", m_user_config_dir.c_str());
         m_user_config_dir = "./";
     }
+    
+    if (m_stdout_dir.empty())
+    {
+        m_stdout_dir = m_user_config_dir;
+    }
+    
     return;
 }   // checkAndCreateConfigDir
 
@@ -1166,6 +1182,20 @@ void FileManager::setStdoutName(const std::string& filename)
 }   // setStdoutName
 
 //-----------------------------------------------------------------------------
+/** Sets the directory for the stdout log file.
+ *  \param dir Directory to use
+ */
+void FileManager::setStdoutDir(const std::string& dir)
+{
+    m_stdout_dir = dir;
+    
+    if (!m_stdout_dir.empty() && m_stdout_dir[m_stdout_dir.size() - 1] != '/')
+    {
+         m_stdout_dir += "/";
+     }
+}   // setStdoutDir
+
+//-----------------------------------------------------------------------------
 /** Redirects output to go into files in the user's config directory
  *  instead of to the console. It keeps backup copies of previous stdout files
  *  (3 atm), which can help to diagnose problems caused by a previous crash.
@@ -1174,7 +1204,7 @@ void FileManager::redirectOutput()
 {
     // Do a simple log rotate: stdout.log.2 becomes stdout.log.3 etc
     const int NUM_BACKUPS=3;
-    std::string logoutfile = getUserConfigFile(m_stdout_filename);
+    std::string logoutfile = m_stdout_dir + m_stdout_filename;
     for(int i=NUM_BACKUPS; i>1; i--)
     {
         std::ostringstream out_old;
@@ -1299,25 +1329,17 @@ void FileManager::listFiles(std::set<std::string>& result,
 {
     result.clear();
 
-    if(!isDirectory(dir))
+    if (!isDirectory(dir))
         return;
 
-    io::path previous_cwd = m_file_system->getWorkingDirectory();
+    irr::io::IFileList* files = m_file_system->createFileList(dir.c_str());
 
-    if(!m_file_system->changeWorkingDirectoryTo( dir.c_str() ))
+    for (int n = 0; n < (int)files->getFileCount(); n++)
     {
-        Log::error("FileManager", "listFiles : Could not change CWD!\n");
-        return;
-    }
-    irr::io::IFileList* files = m_file_system->createFileList();
-
-    for(int n=0; n<(int)files->getFileCount(); n++)
-    {
-        result.insert(make_full_path ? dir+"/"+ files->getFileName(n).c_str()
-                                     : files->getFileName(n).c_str()         );
+        result.insert(make_full_path ? dir + "/" + files->getFileName(n).c_str()
+                                     : files->getFileName(n).c_str());
     }
 
-    m_file_system->changeWorkingDirectoryTo( previous_cwd );
     files->drop();
 }   // listFiles
 

@@ -43,7 +43,7 @@ using namespace Online;
 namespace Online
 {
     RequestManager * RequestManager::m_request_manager = NULL;
-
+    bool RequestManager::m_disable_polling = false;
     // ------------------------------------------------------------------------
     /** Deletes the http manager.
      */
@@ -213,7 +213,13 @@ namespace Online
             me->m_current_request->execute();
             // This test is necessary in case that execute() was aborted
             // (otherwise the assert in addResult will be triggered).
-            if (!me->getAbort()) me->addResult(me->m_current_request);
+            if (!me->getAbort())
+                me->addResult(me->m_current_request);
+            else if (me->m_current_request->manageMemory())
+            {
+                delete me->m_current_request;
+                me->m_current_request = NULL;
+            }
             me->m_request_queue.lock();
         } // while handle all requests
 
@@ -299,7 +305,7 @@ namespace Online
         if (StateManager::get()->getGameState() == GUIEngine::MENU)
                 interval = m_menu_polling_interval;
 
-        if (m_time_since_poll > interval)
+        if (!m_disable_polling && m_time_since_poll > interval)
         {
             m_time_since_poll = 0;
             PlayerManager::requestOnlinePoll();

@@ -25,6 +25,7 @@
 #include "guiengine/modaldialog.hpp"
 #include "guiengine/widget.hpp"
 #include "modes/world.hpp"
+#include "network/network_config.hpp"
 #include "states_screens/state_manager.hpp"
 
 #include <irrlicht.h>
@@ -90,7 +91,8 @@ Screen::~Screen()
  */
 void Screen::init()
 {
-    if(m_pause_race && World::getWorld())
+    if (m_pause_race && World::getWorld() &&
+        !NetworkConfig::get()->isNetworking())
         World::getWorld()->schedulePause(World::IN_GAME_MENU_PHASE);
 }   // init
 
@@ -100,9 +102,7 @@ void Screen::init()
  */
 void Screen::push()
 {
-#ifndef SERVER_ONLY
     StateManager::get()->pushScreen(this);
-#endif
 }   // push
 
 // -----------------------------------------------------------------------------
@@ -113,7 +113,8 @@ void Screen::push()
  */
 void Screen::tearDown()
 {
-    if(m_pause_race && World::getWorld())
+    if (m_pause_race && World::getWorld() &&
+        !NetworkConfig::get()->isNetworking())
         World::getWorld()->scheduleUnpause();
 }   // tearDown
 
@@ -129,7 +130,7 @@ void Screen::loadFromFile()
 {
     assert(m_magic_number == 0xCAFEC001);
 
-    std::string path = file_manager->getAssetChecked(FileManager::GUI, m_filename, true);
+    std::string path = file_manager->getAssetChecked(FileManager::GUI_SCREEN, m_filename, true);
     IXMLReader* xml = file_manager->createXMLReader( path );
 
     parseScreenFileDiv(xml, m_widgets);

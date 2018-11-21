@@ -26,6 +26,8 @@
 #include <vector>
 #include <sstream>
 #include <irrString.h>
+#include <IGUIFont.h>
+#include "utils/constants.hpp"
 #include "utils/types.hpp"
 #include "utils/log.hpp"
 
@@ -244,9 +246,30 @@ namespace StringUtils
     std::string wideToUtf8(const wchar_t* input);
     std::string wideToUtf8(const irr::core::stringw& input);
     std::string findAndReplace(const std::string& source, const std::string& find, const std::string& replace);
-    std::string base64(const std::vector<uint8_t>& input);
-    std::vector<uint8_t> decode64(std::string input);
+    std::string removeWhitespaces(const std::string& input);
+    void breakText(const std::wstring& input, std::vector<std::wstring> &output,
+                   unsigned int max_width, irr::gui::IGUIFont* font, bool right_to_left=false);
+    bool breakable (wchar_t c);
+    bool partOfLongUnicodeChar (wchar_t c);
 
+    inline std::string getUserAgentString()
+    {
+        std::string uagent(std::string("SuperTuxKart/") + STK_VERSION);
+#ifdef WIN32
+        uagent += (std::string)" (Windows)";
+#elif defined(__APPLE__)
+        uagent += (std::string)" (Macintosh)";
+#elif defined(__FreeBSD__)
+        uagent += (std::string)" (FreeBSD)";
+#elif defined(ANDROID)
+        uagent += (std::string)" (Android)";
+#elif defined(linux)
+        uagent += (std::string)" (Linux)";
+#else
+        // Unknown system type
+#endif
+        return uagent;
+    }
 } // namespace StringUtils
 
 #endif

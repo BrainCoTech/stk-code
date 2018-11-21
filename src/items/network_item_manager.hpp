@@ -48,6 +48,9 @@ private:
       * server data. This is used in case of rewind. */
     std::vector<ItemState*> m_confirmed_state;
 
+    /** The switch ticks value at the lime of the last confirmed state. */
+    int m_confirmed_switch_ticks;
+
     /** Time at which m_confirmed_state was taken. */
     int m_confirmed_state_time;
 
@@ -61,22 +64,28 @@ private:
     void forwardTime(int ticks);
 
     NetworkItemManager();
-    virtual ~NetworkItemManager();
 
 public:
-    static void create();
 
-    void setSwitchItems(const std::vector<int> &switch_items);
+    static bool m_network_item_debugging;
+
+    static void create();
+    virtual ~NetworkItemManager();
+
     void sendItemUpdate();
-    void saveInitialState();
+    void initClientConfirmState();
 
     virtual void reset() OVERRIDE;
     virtual void setItemConfirmationTime(std::weak_ptr<STKPeer> peer,
                                          int ticks) OVERRIDE;
-    virtual void collectedItem(Item *item, AbstractKart *kart) OVERRIDE;
-    virtual Item* dropNewItem(ItemState::ItemType type, const AbstractKart *kart,
-                              const Vec3 *xyz=NULL) OVERRIDE;
-    virtual BareNetworkString* saveState() OVERRIDE;
+    virtual void  collectedItem(ItemState *item, AbstractKart *kart) OVERRIDE;
+    virtual void  switchItems() OVERRIDE;
+    virtual Item* dropNewItem(ItemState::ItemType type,
+                              const AbstractKart *kart,
+                              const Vec3 *server_xyz = NULL,
+                              const Vec3 *server_normal = NULL) OVERRIDE;
+    virtual BareNetworkString* saveState(std::vector<std::string>* ru)
+        OVERRIDE;
     virtual void restoreState(BareNetworkString *buffer, int count) OVERRIDE;
     // ------------------------------------------------------------------------
     virtual void rewindToEvent(BareNetworkString *bns) OVERRIDE {};
