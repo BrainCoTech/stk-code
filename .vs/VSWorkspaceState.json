@@ -1,0 +1,16 @@
+{
+  "ExpandedNodes": [
+    "",
+    "\\cmake",
+    "\\lib",
+    "\\lib\\fusi_sdk",
+    "\\lib\\fusi_sdk\\include",
+    "\\lib\\graphics_utils",
+    "\\lib\\graphics_utils\\mipmap",
+    "\\lib\\wiiuse",
+    "\\src",
+    "\\src\\input"
+  ],
+  "SelectedNode": "\\CMakeLists.txt",
+  "PreviewInSolutionExplorer": false
+}
