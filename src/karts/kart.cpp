@@ -1002,12 +1002,8 @@ void Kart::finishedRace(float time, bool from_server)
         }
     }
 
-    if (race_manager->getMinorMode() == RaceManager::MINOR_MODE_NORMAL_RACE   ||
-        race_manager->getMinorMode() == RaceManager::MINOR_MODE_TIME_TRIAL    ||
-        race_manager->getMinorMode() == RaceManager::MINOR_MODE_FOLLOW_LEADER ||
-        race_manager->getMinorMode() == RaceManager::MINOR_MODE_BATTLE     ||
-        race_manager->getMinorMode() == RaceManager::MINOR_MODE_SOCCER        ||
-        race_manager->getMinorMode() == RaceManager::MINOR_MODE_EASTER_EGG)
+    if (race_manager->isLinearRaceMode() || race_manager->isBattleMode() ||
+        race_manager->isSoccerMode()     || race_manager->isEggHuntMode())
     {
         // Save for music handling in race result gui
         setRaceResult();
@@ -1065,17 +1061,17 @@ void Kart::setRaceResult()
         }
     }
     else if (race_manager->getMinorMode() == RaceManager::MINOR_MODE_FOLLOW_LEADER ||
-             race_manager->getMajorMode() == RaceManager::MAJOR_MODE_3_STRIKES)
+             race_manager->getMinorMode() == RaceManager::MINOR_MODE_3_STRIKES)
     {
         // the kart wins if it isn't eliminated
         m_race_result = !this->isEliminated();
     }
-    else if (race_manager->getMajorMode() == RaceManager::MAJOR_MODE_FREE_FOR_ALL)
+    else if (race_manager->getMinorMode() == RaceManager::MINOR_MODE_FREE_FOR_ALL)
     {
         FreeForAll* ffa = dynamic_cast<FreeForAll*>(World::getWorld());
         m_race_result = ffa->getKartFFAResult(getWorldKartId());
     }
-    else if (race_manager->getMajorMode() == RaceManager::MAJOR_MODE_CAPTURE_THE_FLAG)
+    else if (race_manager->getMinorMode() == RaceManager::MINOR_MODE_CAPTURE_THE_FLAG)
     {
         CaptureTheFlag* ctf = dynamic_cast<CaptureTheFlag*>(World::getWorld());
         m_race_result = ctf->getKartCTFResult(getWorldKartId());
@@ -1580,7 +1576,13 @@ void Kart::update(int ticks)
         }
         // use() needs to be called even if there currently is no collecteable
         // since use() can test if something needs to be switched on/off.
-        m_powerup->use() ;
+        if (!World::getWorld()->isStartPhase())
+            m_powerup->use();
+        else
+        {
+            if(!getKartAnimation())
+                beep();
+        }
         World::getWorld()->onFirePressed(getController());
         m_fire_clicked = 1;
     }
@@ -3299,35 +3301,18 @@ void Kart::setOnScreenText(const wchar_t *text)
         return;
         
     BoldFace* bold_face = font_manager->getFont<BoldFace>();
-    core::dimension2d<u32> textsize = bold_face->getDimension(text);
-
+    STKTextBillboard* tb =
+        new STKTextBillboard(
+        GUIEngine::getSkin()->getColor("font::bottom"),
+        GUIEngine::getSkin()->getColor("font::top"),
+        getNode(), irr_driver->getSceneManager(), -1,
+        core::vector3df(0.0f, 1.5f, 0.0f),
+        core::vector3df(0.35f, 0.35f, 0.35f));
     if (CVS->isGLSL())
-    {
-        STKTextBillboard* tb =
-            new STKTextBillboard(
-            GUIEngine::getSkin()->getColor("font::bottom"),
-            GUIEngine::getSkin()->getColor("font::top"),
-            getNode(), irr_driver->getSceneManager(), -1,
-            core::vector3df(0.0f, 1.5f, 0.0f),
-            core::vector3df(1.0f, 1.0f, 1.0f));
         tb->init(text, bold_face);
-        tb->drop();
-    }
     else
-    {
-        scene::ISceneManager* sm = irr_driver->getSceneManager();
-        sm->addBillboardTextSceneNode(GUIEngine::getFont() ? GUIEngine::getFont()
-                                                           : GUIEngine::getTitleFont(),
-            text,
-            getNode(),
-            core::dimension2df(textsize.Width/55.0f,
-            textsize.Height/55.0f),
-            core::vector3df(0.0f, 1.5f, 0.0f),
-            -1, // id
-            GUIEngine::getSkin()->getColor("font::bottom"),
-            GUIEngine::getSkin()->getColor("font::top"));
-    }
-
+        tb->initLegacy(text, bold_face);
+    tb->drop();
     // No need to store the reference to the billboard scene node:
     // It has one reference to the parent, and will get deleted
     // when the parent is deleted.

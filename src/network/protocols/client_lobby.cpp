@@ -26,6 +26,7 @@
 #include "guiengine/screen_keyboard.hpp"
 #include "input/device_manager.hpp"
 #include "items/item_manager.hpp"
+#include "items/powerup_manager.hpp"
 #include "karts/kart_properties_manager.hpp"
 #include "modes/linear_world.hpp"
 #include "network/crypto.hpp"
@@ -275,7 +276,7 @@ void ClientLobby::addAllPlayers(Event* event)
     }
     uint32_t random_seed = data.getUInt32();
     ItemManager::updateRandomSeed(random_seed);
-    if (race_manager->getMinorMode() == RaceManager::MINOR_MODE_BATTLE)
+    if (race_manager->isBattleMode())
     {
         int hit_capture_limit = data.getUInt32();
         float time_limit = data.getFloat();
@@ -466,21 +467,19 @@ void ClientLobby::displayPlayerVote(Event* event)
     core::stringw yes = _("Yes");
     core::stringw no = _("No");
     core::stringw vote_msg;
-    if (race_manager->getMinorMode() == RaceManager::MINOR_MODE_BATTLE &&
-        race_manager->getMajorMode() == RaceManager::MAJOR_MODE_FREE_FOR_ALL)
+    if (race_manager->getMinorMode() == RaceManager::MINOR_MODE_FREE_FOR_ALL)
     {
         //I18N: Vote message in network game from a player
         vote_msg = _("Track: %s,\nrandom item location: %s",
             track_readable, rev == 1 ? yes : no);
     }
-    else if (race_manager->getMinorMode() == RaceManager::MINOR_MODE_BATTLE &&
-        race_manager->getMajorMode() ==
-        RaceManager::MAJOR_MODE_CAPTURE_THE_FLAG)
+    else if (race_manager->getMinorMode() ==
+             RaceManager::MINOR_MODE_CAPTURE_THE_FLAG)
     {
         //I18N: Vote message in network game from a player
         vote_msg = _("Track: %s", track_readable);
     }
-    else if (race_manager->getMinorMode() == RaceManager::MINOR_MODE_SOCCER)
+    else if (race_manager->isSoccerMode())
     {
         if (m_game_setup->isSoccerGoalTarget())
         {
@@ -604,16 +603,10 @@ void ClientLobby::handleServerInfo(Event* event)
     NetworkingLobby::getInstance()->addMoreServerInfo(each_line);
 
     u_data = data.getUInt8();
-    ServerConfig::m_server_mode = u_data;
-    auto game_mode = ServerConfig::getLocalGameMode();
+    auto game_mode = ServerConfig::getLocalGameMode(u_data);
     race_manager->setMinorMode(game_mode.first);
-    if (game_mode.first == RaceManager::MINOR_MODE_BATTLE)
-        race_manager->setMajorMode(game_mode.second);
-    else
-    {
-        // We use single mode in network even it's grand prix
-        race_manager->setMajorMode(RaceManager::MAJOR_MODE_SINGLE);
-    }
+    // We use single mode in network even it's grand prix
+    race_manager->setMajorMode(RaceManager::MAJOR_MODE_SINGLE);
 
     //I18N: In the networking lobby
     core::stringw mode_name = ServerConfig::getModeName(u_data);
@@ -666,6 +659,8 @@ void ClientLobby::handleServerInfo(Event* event)
         for (const core::stringw& motd : motd_line)
             NetworkingLobby::getInstance()->addMoreServerInfo(motd);
     }
+    bool server_config = data.getUInt8() == 1;
+    NetworkingLobby::getInstance()->toggleServerConfigButton(server_config);
 }   // handleServerInfo
 
 //-----------------------------------------------------------------------------
@@ -823,6 +818,7 @@ void ClientLobby::startGame(Event* event)
 {
     World::getWorld()->setPhase(WorldStatus::SERVER_READY_PHASE);
     uint64_t start_time = event->data().getUInt64();
+    powerup_manager->setRandomSeed(start_time);
     joinStartGameThread();
     m_start_game_thread = std::thread([start_time, this]()
         {
