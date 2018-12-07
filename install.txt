@@ -9,7 +9,7 @@ git clone https://github.com/supertuxkart/stk-code.git stk-code
 svn checkout https://svn.code.sf.net/p/supertuxkart/code/stk-assets stk-assets
 Then make sure you put the stk-code folder and stk-assets folder in the same directory, otherwise build will failed. 
 
-3. Download the Windows dependencies package from the following link: https://sourceforge.net/projects/supertuxkart/files/SuperTuxKart%20Dependencies/Windows/ and unpack it. When finished, copy the dependencies directory from windows_64bit directory into the stk-code directory; rename it to dependencies-64bit.
+3. Download the Windows dependencies package from the following link: https://sourceforge.net/projects/supertuxkart/files/SuperTuxKart%20Dependencies/Windows/ and unpack it. When finished, copy the dependencies directory from windows_64bit directory into the stk-code directory; rename it to [dependencies].
 
 4. Download CMake from the following link: https://cmake.org/download/ , install it; once CMake is installed, double click on the CMake icon on your desktop, and point it towards your stk-code directory in the 'Where is the source code' field; create a new directory called build inside the stk-code directory and point "Where to build the binaries" to that directory.
 
