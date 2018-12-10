@@ -475,7 +475,6 @@ void RaceResultGUI::backToLobby()
     cleanupGPProgress();
     StateManager::get()->resetAndSetStack(
         NetworkConfig::get()->getResetScreens(true/*lobby*/).data());
-    NetworkingLobby::getInstance()->addMoreServerInfo(L"--------------------");
 }   // backToLobby
 
 //-----------------------------------------------------------------------------
