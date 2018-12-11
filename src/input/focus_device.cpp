@@ -36,21 +36,22 @@ static void input(irr::SEvent event)
 
 static void on_device_connect_callback(const char* device_mac, DeviceConnectionState state)
 {
-    Log::info("Focus device manager","connected %s", device_mac);
+    Log::info("Focus device","connected %s", device_mac);
 }
 
 static void on_device_attention_callback(const char* device_mac, double attention){
-    Log::info("Focus device manager","connected %s %f", device_mac, attention);
+    Log::info("Focus device","attention returned %s %f", device_mac, attention);
     irr::SEvent event;
     event.EventType = irr::EET_USER_EVENT;
     event.UserEvent.UserData1 = focus_device_manager->getDeviceIdFromMac(device_mac);
     event.UserEvent.UserData2 = attention;
-    event.UserEvent.type = 100;
+    event.UserEvent.type = Input::IT_FOCUS;
     input(event);
 }
 
 static void on_device_connection_change_callback(const char* device_mac, DeviceConnectionState state)
 {
+	Log::info("Focus device", "connection changed %s %f", device_mac, state);
     irr::SEvent event;
     event.EventType = irr::EET_USER_EVENT;
     event.UserEvent.UserData1 = focus_device_manager->getDeviceIdFromMac(device_mac);
@@ -67,6 +68,7 @@ static void on_device_connection_change_callback(const char* device_mac, DeviceC
 
 static void on_device_contact_state_change_callback(const char* device_mac, DeviceContactState state)
 {
+	Log::info("Focus device", "contact state changed %s %f", device_mac, state);
     irr::SEvent event;
     event.EventType = irr::EET_USER_EVENT;
     event.UserEvent.UserData1 = focus_device_manager->getDeviceIdFromMac(device_mac);
@@ -83,7 +85,7 @@ static void on_device_contact_state_change_callback(const char* device_mac, Devi
 
 static int calibration_begin = 0;
 static int calibration_end = 0;
-static int calibration_expected_num = 180;
+static int calibration_expected_num = 0;
 static int calibration_finished_num = 0;
 static int calibration_max = 0;
 static int calibration_min = 100;
@@ -177,16 +179,17 @@ static void on_eeg_stats_callback(const char* device_mac, EEGStats* stats){
     double newAcc =  stats->low_beta*250/(stats->theta + stats ->alpha);
     if(newAcc > 100.0) newAcc = 100.0;
     if(newAcc <= 1) newAcc = 1;
-    Log::warn("Focus device","lowbeta[%f] theta[%f] result[%f]", stats->low_beta, stats->theta, newAcc);
+    Log::info("Focus device","lowbeta[%f] theta[%f] result[%f]", stats->low_beta, stats->theta, newAcc);
 
     if(calibration_end > 0){
         //int current = thresholding_strategy_2((int)newAcc, calibration_min, calibration_max);
-        Log::warn("focus device", "calibration_min[%d] calibration_max[%d] new[%f]", calibration_min, calibration_max, newAcc);
+        //Log::info("focus device", "calibration_min[%d] calibration_max[%d] new[%f]", calibration_min, calibration_max, newAcc);
         event.UserEvent.UserData2 = newAcc;
         event.UserEvent.type = Input::IT_FOCUS;
         input(event);
     }
     else if(calibration_begin > 0){
+		Log::info("focus device", "calibration begin [%d]", calibration_begin);
         if(calibration_finished_num >= calibration_expected_num){
             calibration_end = 1;
             event.UserEvent.UserData2 = 5;
@@ -201,6 +204,7 @@ static void on_eeg_stats_callback(const char* device_mac, EEGStats* stats){
         }
     }
     else if(calibration_begin == 0){
+		Log::info("focus device", "calibration begin [%d]", calibration_begin);
         calibration_begin = 1;
         calibration_add(newAcc);
         event.UserEvent.UserData2 = 4;
@@ -211,7 +215,7 @@ static void on_eeg_stats_callback(const char* device_mac, EEGStats* stats){
 }
 
 void FocusDevice::connectDevice(){
-    Log::info("Focus device manager","start connecting %s %s", m_focus_device_info->mac, m_focus_device_info->ip);
+    Log::info("Focus device","start connecting %s %s", m_focus_device_info->mac, m_focus_device_info->ip);
     m_focus_device = fusi_device_create(*m_focus_device_info);
     //set_attention_callback(m_focus_device, on_device_attention_callback);
     set_eeg_stats_callback(m_focus_device, on_eeg_stats_callback);
@@ -246,6 +250,7 @@ bool FocusDevice::processAndMapInput(Input::InputType type,  const int id,
                                         InputManager::InputDriverMode mode,
                                         PlayerAction *action, int* value)
 {
+	Log::info("Focus device", "processAndMapInput mode and type %d %d", mode, type);
     // bindings can only be accessed in game
     if (mode == InputManager::INGAME)
     {
@@ -254,14 +259,14 @@ bool FocusDevice::processAndMapInput(Input::InputType type,  const int id,
             //return m_configuration->getGameAction(Input::IT_FOCUS, id, value, action);
             *action = PlayerAction(PA_FOCUS);
             *value = int(Input::MAX_VALUE * (*value) / 100);
+			return true;
         }
-        return true;
-    }
-
-    if(type == Input::IT_FOCUS_CONTACT)
-    {
-        *action = PlayerAction(PA_FOCUS_CONTACT);
-        return true;
+		if (type == Input::IT_FOCUS_CONTACT)
+		{
+			//return m_configuration->getGameAction(Input::IT_FOCUS_CONTACT, id, value, action);
+			*action = PlayerAction(PA_FOCUS_CONTACT);
+			return true;
+		}
     }
     return false;
 }   // processAndMapInput
