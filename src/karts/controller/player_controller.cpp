@@ -267,7 +267,8 @@ bool PlayerController::action(PlayerAction action, int value, bool dry_run)
         SET_OR_TEST(m_focus_val, value);
         // This part is copied from PA_ACCEL
         SET_OR_TEST(m_prev_accel, value);
-        if (value && !(m_penalty_ticks > 0))
+		// Did not find a way to catch brake button released event, check m_prev_brake as a temp solution 
+        if (value && !(m_penalty_ticks > 0) && !(m_prev_brake > 0))
         {
             //float adjusted_accel_value = thresholding_strategy(value/32768.0f);
             float adjusted_accel_value = FocusDevice::thresholding_strategy_3(value*100/32768.0f)/100.0;

@@ -61,7 +61,7 @@ void FocusConfig::setDefaultBinds()
 {
     //Bindings are not set
 	//setBinding(PA_FOCUS, Input::IT_FOCUS, 0);
-	//setBinding(PA_FOCUS_CONTACT, Input::IT_FOCUS, 0);
+	//setBinding(PA_FOCUS_CONTACT, Input::IT_FOCUS_CONTACT, 0);
 }
 
 //------------------------------------------------------------------------------
