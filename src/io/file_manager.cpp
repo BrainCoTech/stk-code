@@ -26,6 +26,7 @@
 #include "karts/kart_properties_manager.hpp"
 #include "tracks/track_manager.hpp"
 #include "utils/command_line.hpp"
+#include "utils/file_utils.hpp"
 #include "utils/log.hpp"
 #include "utils/string_utils.hpp"
 
@@ -89,7 +90,7 @@ bool macSetBundlePathIfRelevant(std::string& data_dir)
     CFStringRef cf_string_ref = CFURLCopyFileSystemPath(main_bundle_URL,
                                                         kCFURLPOSIXPathStyle);
     assert(cf_string_ref);
-    CFStringGetCString(cf_string_ref, path, 1024, kCFStringEncodingASCII);
+    CFStringGetCString(cf_string_ref, path, 1024, kCFStringEncodingUTF8);
     CFRelease(main_bundle_URL);
     CFRelease(cf_string_ref);
 
@@ -115,7 +116,7 @@ FileManager* file_manager = 0;
 /** The constructor of the file manager creates an irrlicht file system and
  *  detects paths for the user config file and assets base directory (data).
  *  A second initialisation is done later once (see init()), once the user
- *  config file is read. This is necessary since part of discoverPaths 
+ *  config file is read. This is necessary since part of discoverPaths
  *  depend on artist debug mode.
  */
 FileManager::FileManager()
@@ -206,19 +207,19 @@ FileManager::FileManager()
 
     if (!m_file_system->existFile((root_dir + version).c_str()))
     {
-        Log::error("FileManager", "Could not file '%s'in any "
+        Log::error("FileManager", "Could not find file '%s'in any "
                    "standard location (esp. ../data).", version.c_str());
-        Log::error("FileManager", 
+        Log::error("FileManager",
                    "Last location checked '%s'.", root_dir.c_str());
-        Log::fatal("FileManager", 
+        Log::fatal("FileManager",
                    "Set $SUPERTUXKART_DATADIR to point to the data directory.");
         // fatal will exit the application
     }
-    
+
     addRootDirs(root_dir);
-    
+
     std::string assets_dir;
-    
+
     if (getenv("SUPERTUXKART_ASSETS_DIR") != NULL)
     {
         assets_dir = std::string(getenv("SUPERTUXKART_ASSETS_DIR"));
@@ -236,7 +237,7 @@ FileManager::FileManager()
         //is this needed?
         assets_dir = std::string(getenv("SUPERTUXKART_ROOT_PATH"));
     }
-    
+
     if (!assets_dir.empty() && assets_dir != root_dir)
     {
         addRootDirs(assets_dir);
@@ -348,8 +349,9 @@ void FileManager::init()
         for(int i=0;i<(int)dirs.size(); i++)
             pushMusicSearchPath(dirs[i]);
     }
-    m_cert_location = m_file_system->getAbsolutePath(
-        getAsset("addons.supertuxkart.net.pem").c_str()).c_str();
+
+    m_cert_bundle_location = m_file_system->getAbsolutePath(
+        getAsset("cacert.pem").c_str()).c_str();
 }   // init
 
 //-----------------------------------------------------------------------------
@@ -384,7 +386,7 @@ FileManager::~FileManager()
             continue;
         }
         struct stat mystat;
-        stat(full_path.c_str(), &mystat);
+        FileUtils::statU8Path(full_path, &mystat);
         StkTime::TimeType current = StkTime::getTimeSinceEpoch();
         if(current - mystat.st_ctime <24*3600)
         {
@@ -796,7 +798,7 @@ bool FileManager::checkAndCreateDirectory(const std::string &path)
 
     // Otherwise try to create the directory:
 #if defined(WIN32) && !defined(__CYGWIN__)
-    bool error = _mkdir(path.c_str()) != 0;
+    bool error = _wmkdir(StringUtils::utf8ToWide(path).c_str()) != 0;
 #else
     bool error = mkdir(path.c_str(), 0755) != 0;
 #endif
@@ -825,7 +827,7 @@ bool FileManager::checkAndCreateDirectoryP(const std::string &path)
         current_path += split[i] + "/";
         //Log::verbose("[FileManager]", "Checking for: '%s",
         //            current_path.c_str());
-        
+
         if (!checkAndCreateDirectory(current_path))
         {
             Log::error("[FileManager]", "Can't create dir '%s'",
@@ -857,9 +859,13 @@ void FileManager::checkAndCreateConfigDir()
 
         // Try to use the APPDATA directory to store config files and highscore
         // lists. If not defined, used the current directory.
-        if (getenv("APPDATA") != NULL)
+        std::vector<wchar_t> env;
+        // An environment variable has a maximum size limit of 32,767 characters
+        env.resize(32767, 0);
+        DWORD length = GetEnvironmentVariable(L"APPDATA", env.data(), 32767);
+        if (length != 0)
         {
-            m_user_config_dir  = getenv("APPDATA");
+            m_user_config_dir = StringUtils::wideToUtf8(env.data());
             if (!checkAndCreateDirectory(m_user_config_dir))
             {
                 Log::error("[FileManager]", "Can't create config dir '%s"
@@ -930,19 +936,19 @@ void FileManager::checkAndCreateConfigDir()
     if(m_user_config_dir.size()>0 && *m_user_config_dir.rbegin()!='/')
         m_user_config_dir += "/";
 
-    m_user_config_dir +="0.10-git/";
+    m_user_config_dir += "config-0.10/";
     if(!checkAndCreateDirectoryP(m_user_config_dir))
     {
         Log::warn("FileManager", "Can not  create config dir '%s', "
                   "falling back to '.'.", m_user_config_dir.c_str());
         m_user_config_dir = "./";
     }
-    
+
     if (m_stdout_dir.empty())
     {
         m_stdout_dir = m_user_config_dir;
     }
-    
+
     return;
 }   // checkAndCreateConfigDir
 
@@ -1188,11 +1194,11 @@ void FileManager::setStdoutName(const std::string& filename)
 void FileManager::setStdoutDir(const std::string& dir)
 {
     m_stdout_dir = dir;
-    
+
     if (!m_stdout_dir.empty() && m_stdout_dir[m_stdout_dir.size() - 1] != '/')
     {
-         m_stdout_dir += "/";
-     }
+        m_stdout_dir += "/";
+    }
 }   // setStdoutDir
 
 //-----------------------------------------------------------------------------
@@ -1214,7 +1220,7 @@ void FileManager::redirectOutput()
         out_new << logoutfile << "." << i-1;
         if(fileExists(out_new.str()))
         {
-            rename(out_new.str().c_str(), out_old.str().c_str());
+            FileUtils::renameU8Path(out_new.str(), out_old.str());
         }
     }   // for i in NUM_BACKUPS
 
@@ -1223,7 +1229,7 @@ void FileManager::redirectOutput()
         std::ostringstream out;
         out << logoutfile<<".1";
         // No good place to log error messages when log is not yet initialised
-        rename(logoutfile.c_str(), out.str().c_str());
+        FileUtils::renameU8Path(logoutfile, out.str());
     }
 
     //Enable logging of stdout and stderr to logfile
@@ -1312,7 +1318,7 @@ bool FileManager::isDirectory(const std::string &path) const
     // a '/' at the end of the path.
     if(s[s.size()-1]=='/')
         s.erase(s.end()-1, s.end());
-    if(stat(s.c_str(), &mystat) < 0) return false;
+    if(FileUtils::statU8Path(s, &mystat) < 0) return false;
     return S_ISDIR(mystat.st_mode);
 }   // isDirectory
 
@@ -1372,9 +1378,15 @@ bool FileManager::removeFile(const std::string &name) const
        return true;
 
     struct stat mystat;
-    if(stat(name.c_str(), &mystat) < 0) return false;
+    if(FileUtils::statU8Path(name, &mystat) < 0) return false;
     if( S_ISREG(mystat.st_mode))
-        return remove(name.c_str())==0;
+    {
+#if defined(WIN32)
+        return _wremove(StringUtils::utf8ToWide(name).c_str()) == 0;
+#else
+        return remove(name.c_str()) == 0;
+#endif
+    }
     return false;
 }   // removeFile
 
@@ -1392,8 +1404,8 @@ bool FileManager::removeDirectory(const std::string &name) const
 
     for (std::string file : files)
     {
-        if (file == "." || file == ".." || file == name + "/." || 
-            file == name + "/..") 
+        if (file == "." || file == ".." || file == name + "/." ||
+            file == name + "/..")
             continue;
 
         if (UserConfigParams::logMisc())
@@ -1417,9 +1429,9 @@ bool FileManager::removeDirectory(const std::string &name) const
             removeFile(file);
         }
     }
-    
+
 #if defined(WIN32)
-    return RemoveDirectory(name.c_str())==TRUE;
+    return RemoveDirectory(StringUtils::utf8ToWide(name).c_str())==TRUE;
 #else
     return remove(name.c_str())==0;
 #endif
@@ -1433,10 +1445,10 @@ bool FileManager::removeDirectory(const std::string &name) const
  */
 bool FileManager::copyFile(const std::string &source, const std::string &dest)
 {
-    FILE *f_source = fopen(source.c_str(), "rb");
+    FILE *f_source = FileUtils::fopenU8Path(source, "rb");
     if(!f_source) return false;
 
-    FILE *f_dest = fopen(dest.c_str(), "wb");
+    FILE *f_dest = FileUtils::fopenU8Path(dest, "wb");
     if(!f_dest)
     {
         fclose(f_source);
@@ -1471,6 +1483,7 @@ bool FileManager::copyFile(const std::string &source, const std::string &dest)
     fclose(f_dest);
     return true;
 }   // copyFile
+
 // ----------------------------------------------------------------------------
 /** Returns true if the first file is newer than the second. The comparison is
 *   based on the modification time of the two files.
@@ -1479,8 +1492,7 @@ bool FileManager::fileIsNewer(const std::string& f1, const std::string& f2) cons
 {
     struct stat stat1;
     struct stat stat2;
-    stat(f1.c_str(), &stat1);
-    stat(f2.c_str(), &stat2);
+    FileUtils::statU8Path(f1, &stat1);
+    FileUtils::statU8Path(f2, &stat2);
     return stat1.st_mtime > stat2.st_mtime;
 }   // fileIsNewer
-

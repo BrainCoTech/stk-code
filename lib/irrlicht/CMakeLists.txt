@@ -2,17 +2,18 @@
 if(NOT SERVER_ONLY)
     find_package(PNG REQUIRED)
     find_package(JPEG REQUIRED)
-
+    find_package(ZLIB REQUIRED)
     include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include/"
                         "${JPEG_INCLUDE_DIR}"
                         "${PNG_INCLUDE_DIRS}"
-                        "${ZLIB_INCLUDE_DIR}")
+                        "${ZLIB_INCLUDE_DIR}"
+                        "${CMAKE_CURRENT_SOURCE_DIR}/../../src")
 
     if(MSVC)
         include_directories("${CMAKE_CURRENT_BINARY_DIR}/../zlib/") # For zconf.h on WIN32
     endif()
 
-    if(MSVC OR APPLE)
+    if(MSVC)
         include_directories("${CMAKE_CURRENT_BINARY_DIR}/../libpng/")
     endif()
 
@@ -61,13 +62,10 @@ if(NOT SERVER_ONLY)
         endif()        
     endif()
 else()
-    include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include/")
-    if(MSVC)
-        include_directories("${CMAKE_CURRENT_BINARY_DIR}/../zlib/")
-    else()
-        find_package(ZLIB REQUIRED)
-        include_directories("${ZLIB_INCLUDE_DIR}")
-    endif()
+    include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include/"
+                        "${CMAKE_CURRENT_SOURCE_DIR}/../../src")
+    find_package(ZLIB REQUIRED)
+    include_directories("${ZLIB_INCLUDE_DIR}")
     add_definitions(-DNO_IRR_COMPILE_WITH_LIBPNG_)
     add_definitions(-DNO_IRR_COMPILE_WITH_LIBJPEG_)
     add_definitions(-DNO_IRR_COMPILE_WITH_BMP_LOADER_)
@@ -97,8 +95,8 @@ if(WIN32)
     add_definitions(-D_IRR_STATIC_LIB_)
     add_definitions(-D_CRT_SECURE_NO_WARNINGS) # Shut up about unsafe stuff
 else()
-    set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -Wall -pipe -O3  -fno-exceptions  -fstrict-aliasing")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -pipe -O3  -fno-exceptions  -fstrict-aliasing")
+    set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -Wall -pipe -O3 -fstrict-aliasing")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -pipe -O3 -fstrict-aliasing")
     if(CMAKE_COMPILER_IS_GNUCC)
         set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -fexpensive-optimizations")
     endif()
@@ -574,15 +572,14 @@ include/SVertexIndex.h
 include/SVertexManipulator.h
 include/SViewFrustum.h
 include/triangle3d.h
-include/utfwrapping.h
 include/vector2d.h
 include/vector3d.h
 )
 
-if(ENABLE_WAYLAND_DEVICE)
+if(NOT SERVER_ONLY AND ENABLE_WAYLAND_DEVICE)
     set(IRRLICHT_SOURCES 
         ${IRRLICHT_SOURCES}
-        source/Irrlicht/server_decoration_client_protocol.c
+        source/Irrlicht/xdg_decoration_unstable_v1_protocol.c
         source/Irrlicht/xdg_shell_protocol.c)
 endif()
 

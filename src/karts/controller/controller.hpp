@@ -78,7 +78,7 @@ public:
      *  rubber-banding. */
     virtual bool  isPlayerController () const = 0;
     virtual bool  disableSlipstreamBonus() const = 0;
-    virtual void  saveState(BareNetworkString *buffer) const = 0;
+    virtual bool  saveState(BareNetworkString *buffer) const = 0;
     virtual void  rewindTo(BareNetworkString *buffer) = 0;
 
     // ---------------------------------------------------------------------------
@@ -122,7 +122,6 @@ public:
     virtual int getDeviceContactValue() const {return input_manager->getDeviceContactValue(); };
 };   // Controller
 
-extern Translations* translations;
 #endif
 
 /* EOF */

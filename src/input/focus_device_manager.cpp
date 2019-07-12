@@ -8,6 +8,7 @@
 #include "states_screens/dialogs/message_dialog.hpp"
 #include <vector>
 #include "fusi_sdk.h"
+#include <sstream>
 #include <chrono>
 #include "guiengine/screen_keyboard.hpp"
 using namespace std;

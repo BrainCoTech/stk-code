@@ -24,9 +24,9 @@ export TRACKS="abyss arena_candela_city battleisland cave cornfield_crossing   \
                endcutscene featunlocked fortmagma gplose gpwin hacienda        \
                icy_soccer_field introcutscene introcutscene2 lasdunasarena     \
                lasdunassoccer lighthouse mines minigolf olivermath overworld   \
-               sandtrack scotland snowmountain snowtuxpeak soccer_field        \
-               stadium stk_enterprise temple tutorial volcano_island xr591     \
-               zengarden"
+               ravenbridge_mansion sandtrack scotland snowmountain snowtuxpeak \
+               soccer_field stadium stk_enterprise temple tutorial             \
+               volcano_island xr591 zengarden"
 
 export ASSETS_PATHS="../data                    \
                      ../../stk-assets           \
@@ -37,6 +37,7 @@ export ASSETS_DIRS="library models music sfx textures"
 export TEXTURE_SIZE=256
 export JPEG_QUALITY=85
 export PNG_QUALITY=95
+export PNGQUANT_QUALITY=90
 export SOUND_QUALITY=42
 export SOUND_MONO=1
 export SOUND_SAMPLE=32000
@@ -45,8 +46,7 @@ export RUN_OPTIMIZE_SCRIPT=0
 export DECREASE_QUALITY=1
 export CONVERT_TO_JPG=1
 
-export CONVERT_TO_JPG_BLACKLIST="data/karts/hexley/hexley_kart_diffuse.png \
-                                 data/models/traffic_light.png"
+export CONVERT_TO_JPG_BLACKLIST="data/models/traffic_light.png"
 
 export BLACKLIST_FILES="data/music/cocoa_river_fast.ogg2"
 
@@ -271,7 +271,7 @@ optimize_png()
         return
     fi
     
-    pngquant --force --skip-if-larger --output "$FILE" -- "$FILE"
+    pngquant --force --skip-if-larger --quality 0-$PNGQUANT_QUALITY --output "$FILE" -- "$FILE"
 }
 
 convert_to_jpg()
@@ -569,7 +569,9 @@ fi
 if [ $CONVERT_TO_JPG -gt 0 ]; then
     rm -f "./converted_textures"
     
-    find assets/data -not -path "assets/data/textures/*" -iname "*.png" | while read f; do convert_to_jpg "$f"; done
+    find assets/data -not -path "assets/data/textures/*" \
+                     -not -path "assets/data/karts/*"    \
+                     -iname "*.png" | while read f; do convert_to_jpg "$f"; done
 
     find assets/data -iname "*.b3dz" | while read f; do convert_to_jpg_extract_b3dz "$f"; done
     find assets/data -iname "*.b3d" | while read f; do convert_to_jpg_update_b3d "$f"; done
