@@ -674,13 +674,11 @@ endif()
 if(UNIX AND NOT SERVER_ONLY)
     include_directories("${PROJECT_SOURCE_DIR}/lib/fusi_sdk/include")
     target_link_libraries(supertuxkart ${PROJECT_SOURCE_DIR}/lib/fusi_sdk/libfusi.a)
-    target_link_libraries(supertuxkart ${PROJECT_SOURCE_DIR}/lib/fusi_sdk/libuv.a)
 elseif(MSVC AND NOT SERVER_ONLY)
     include_directories("${PROJECT_SOURCE_DIR}/lib/fusi_sdk/include")
     target_link_libraries(supertuxkart ${PROJECT_SOURCE_DIR}/lib/fusi_sdk/psapi.lib)
     target_link_libraries(supertuxkart ${PROJECT_SOURCE_DIR}/lib/fusi_sdk/userenv.lib)
     target_link_libraries(supertuxkart ${PROJECT_SOURCE_DIR}/lib/fusi_sdk/libfusi.lib)
-    target_link_libraries(supertuxkart ${PROJECT_SOURCE_DIR}/lib/fusi_sdk/libuv.lib)
 endif()
 
 # ==== Checking if data folder exists ====
