@@ -18,6 +18,7 @@ extern "C" {
 #endif
 
 //CFFI_DEF_START
+
 typedef struct FusiDevice FusiDevice;
 
 typedef struct {
@@ -129,9 +130,10 @@ typedef void (*on_found_fusi_devices)(FusiDeviceInfo* device, int count, FusiErr
 typedef void (*on_attention)(const char* device_mac, double attention);
 typedef void (*on_meditation)(const char* device_mac, double meditation);
 typedef void (*on_blink)(const char* device_mac); //, int is_heavy_blink);
+typedef void (*on_powerband_noise)(const char* device_mac);
 typedef void (*on_eeg_data)(const char* device_mac, EEGData* data);
 typedef void (*on_eeg_stats)(const char* device_mac, EEGStats* stats);
-typedef void (*on_oriention_change)(const char* device_mac, DeviceOrientation state);
+typedef void (*on_orientation_change)(const char* device_mac, DeviceOrientation state);
 typedef void (*on_error) (const char* device_mac, FusiError* err);
 typedef void (*on_device_connection_change)(const char* device_mac, DeviceConnectionState event);
 typedef void (*on_device_contact_state_change)(const char* device_mac, DeviceContactState state);
@@ -169,11 +171,12 @@ SDK_EXTERN int set_attention_callback(FusiDevice* device, on_attention cb);
 SDK_EXTERN int set_meditation_callback(FusiDevice* device, on_meditation cb);
 SDK_EXTERN int set_eeg_data_callback(FusiDevice* device, on_eeg_data cb);
 SDK_EXTERN int set_eeg_stats_callback(FusiDevice* device, on_eeg_stats cb);
-SDK_EXTERN int set_device_oriention_callback(FusiDevice* device, on_oriention_change cb);
+SDK_EXTERN int set_device_orientation_callback(FusiDevice* device, on_orientation_change cb);
 SDK_EXTERN int set_error_callback(FusiDevice* device, on_error cb);
 SDK_EXTERN int set_device_connection_callback(FusiDevice* device, on_device_connection_change cb);
 SDK_EXTERN int set_device_contact_state_callback(FusiDevice* device, on_device_contact_state_change cb);
 SDK_EXTERN int set_blink_callback(FusiDevice* device, on_blink cb);
+SDK_EXTERN int set_powerband_noise_callback(FusiDevice* device, on_powerband_noise cb);
 SDK_EXTERN int set_log_callback(on_log cb);
 
 // sync set firmware update callbacks
@@ -195,12 +198,16 @@ SDK_EXTERN int fusi_devices_search(on_found_fusi_devices cb, int interval_ms);
 SDK_EXTERN int fusi_connect(FusiDevice* device, on_device_connection_change cb, int auto_reconnect);
 SDK_EXTERN int fusi_disconnect(FusiDevice*);
 SDK_EXTERN int fusi_disconnect_ota(FusiDevice* device);
-SDK_EXTERN int fusi_set_forehead_led_color(FusiDevice* device, int color);
+SDK_EXTERN int fusi_set_forehead_led_color(FusiDevice* device, unsigned int color);
 
 // Firmware update APIs
-SDK_EXTERN int fusi_update_firmware(FusiDevice* device,const char* firmware_data,int size, on_firmware_update_status status_cb); //, on_firmware_update_log log_cb
+SDK_EXTERN int fusi_update_firmware(FusiDevice* device, const char* firmware_data,int size, on_firmware_update_status status_cb); //, on_firmware_update_log log_cb
 // SDK_EXTERN int fusi_ota_send_firmware_info(FusiDevice* device, int size, int crc);
 
+// Experimental features
+SDK_EXTERN void* get_fft_transformer(int signal_length, int scale_output);
+SDK_EXTERN double* fft_transform(void* transformer, double* signal);
+SDK_EXTERN void free_data(double* data);
 SDK_EXTERN int hello(int num);
 //CFFI_DEF_END
 
