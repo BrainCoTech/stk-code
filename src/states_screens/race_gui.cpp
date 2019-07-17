@@ -1313,7 +1313,6 @@ void RaceGUI::drawFocusMeter(const AbstractKart* kart,
     float focusValue = (kart->getController())->getFocusValue();
     float focusRatio = focusValue/(float)(Input::MAX_VALUE);
     int focusScore = (int)(focusRatio * 100);
-    Log::info("Race gui","%f", focusRatio);
 
     core::vector2df offset;
     offset.X = (float)(viewport.LowerRightCorner.X-gauge_width) - 44.0f*scaling.X;
