@@ -585,6 +585,7 @@ void InputManager::inputSensing(Input::InputType type, int deviceID,
         case Input::IT_MOUSEMOTION:
         case Input::IT_MOUSEBUTTON:
         case Input::IT_FOCUS:
+        case Input::IT_FOCUS_CONTACT:
             // uninteresting (but we keep them here to explicitely state we do
             // nothing with them, and thus to fix warnings)
             break;
