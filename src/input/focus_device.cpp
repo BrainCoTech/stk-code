@@ -217,8 +217,8 @@ static void on_eeg_stats_callback(const char* device_mac, EEGStats* stats){
 void FocusDevice::connectDevice(){
     Log::info("Focus device","start connecting %s %s", m_focus_device_info->mac, m_focus_device_info->ip);
     m_focus_device = fusi_device_create(*m_focus_device_info);
-    //set_attention_callback(m_focus_device, on_device_attention_callback);
-    set_eeg_stats_callback(m_focus_device, on_eeg_stats_callback);
+    set_attention_callback(m_focus_device, on_device_attention_callback);
+    //set_eeg_stats_callback(m_focus_device, on_eeg_stats_callback);
     set_device_connection_callback(m_focus_device, on_device_connection_change_callback);
     set_device_contact_state_callback(m_focus_device, on_device_contact_state_change_callback);
     set_eeg_data_callback(m_focus_device, on_eeg_data_callback);

@@ -271,17 +271,16 @@ bool PlayerController::action(PlayerAction action, int value, bool dry_run)
         }
         break;
     case PA_FOCUS:
+    {
         Log::warn("player controller","[%s] focus accel %d",getName().c_str(), value);
         SET_OR_TEST(m_focus_val, value);
         // This part is copied from PA_ACCEL
-        SET_OR_TEST(m_prev_accel, value);
+        uint16_t v16 = (uint16_t)value;
+        SET_OR_TEST(m_prev_accel, v16);
 		// Did not find a way to catch brake button released event, check m_prev_brake as a temp solution 
-        if (value && !(m_penalty_ticks > 0) && !(m_prev_brake > 0))
+        if (v16 && !(m_penalty_ticks > 0) && !(m_prev_brake > 0))
         {
-            //float adjusted_accel_value = thresholding_strategy(value/32768.0f);
-            float adjusted_accel_value = FocusDevice::thresholding_strategy_3(value*100/32768.0f)/100.0;
-            SET_OR_TEST_GETTER(Accel, adjusted_accel_value);
-            Log::warn("player controller","[%s] focus adjusted accel %f",getName().c_str(), adjusted_accel_value);
+            SET_OR_TEST_GETTER(Accel, v16 / 32768.0f);
             SET_OR_TEST_GETTER(Brake, false);
             SET_OR_TEST_GETTER(Nitro, m_prev_nitro);
         }
@@ -291,8 +290,8 @@ bool PlayerController::action(PlayerAction action, int value, bool dry_run)
             SET_OR_TEST_GETTER(Brake, m_prev_brake);
             SET_OR_TEST_GETTER(Nitro, false);
         }
-        Log::warn("player controller","[%s] focus accel after %d",getName().c_str(), value);
         break;
+    }
     default:
        break;
     }
