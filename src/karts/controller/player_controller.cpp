@@ -272,13 +272,12 @@ bool PlayerController::action(PlayerAction action, int value, bool dry_run)
         break;
     case PA_FOCUS:
     {
-        Log::warn("player controller","[%s] focus accel %d",getName().c_str(), value);
         SET_OR_TEST(m_focus_val, value);
         // This part is copied from PA_ACCEL
         uint16_t v16 = (uint16_t)value;
         SET_OR_TEST(m_prev_accel, v16);
 		// Did not find a way to catch brake button released event, check m_prev_brake as a temp solution 
-        if (v16 && !(m_penalty_ticks > 0) && !(m_prev_brake > 0))
+        if (v16 && !(m_prev_brake > 0))
         {
             SET_OR_TEST_GETTER(Accel, v16 / 32768.0f);
             SET_OR_TEST_GETTER(Brake, false);
