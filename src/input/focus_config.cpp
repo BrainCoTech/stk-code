@@ -50,7 +50,11 @@ FocusConfig::FocusConfig()
  */
 void FocusConfig::save(std::ofstream& stream)
 {
-    stream << "<focus ";
+    stream << "<focus name =\"" << getName()
+           << "\" deadzone=\""    << getName()
+           << "\" desensitize=\"" << getName()
+           << "\" analog=\""      << getName()<<"\"\n";
+    stream << "         ";
     DeviceConfig::save(stream);
     stream << "</focus>\n\n";
 }  // save
