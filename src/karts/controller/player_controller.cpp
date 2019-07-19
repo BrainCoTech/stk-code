@@ -273,21 +273,24 @@ bool PlayerController::action(PlayerAction action, int value, bool dry_run)
     case PA_FOCUS:
     {
         SET_OR_TEST(m_focus_val, value);
-        // This part is copied from PA_ACCEL
-        uint16_t v16 = (uint16_t)value;
-        SET_OR_TEST(m_prev_accel, v16);
-		// Did not find a way to catch brake button released event, check m_prev_brake as a temp solution 
-        if (v16 && !(m_prev_brake > 0))
-        {
-            SET_OR_TEST_GETTER(Accel, v16 / 32768.0f);
-            SET_OR_TEST_GETTER(Brake, false);
-            SET_OR_TEST_GETTER(Nitro, m_prev_nitro);
-        }
-        else
-        {
-            SET_OR_TEST_GETTER(Accel, 0.0f);
-            SET_OR_TEST_GETTER(Brake, m_prev_brake);
-            SET_OR_TEST_GETTER(Nitro, false);
+        //Player will get penalty if accelerate in start phase
+        if(World::getWorld()->isRacePhase()){
+            // This part is copied from PA_ACCEL
+            uint16_t v16 = (uint16_t)value;
+            SET_OR_TEST(m_prev_accel, v16);
+		    // Did not find a way to catch brake button released event, check m_prev_brake as a temp solution 
+            if (v16 && !(m_prev_brake > 0))
+            {
+                SET_OR_TEST_GETTER(Accel, v16 / 32768.0f);
+                SET_OR_TEST_GETTER(Brake, false);
+                SET_OR_TEST_GETTER(Nitro, m_prev_nitro);
+            }
+            else
+            {
+                SET_OR_TEST_GETTER(Accel, 0.0f);
+                SET_OR_TEST_GETTER(Brake, m_prev_brake);
+                SET_OR_TEST_GETTER(Nitro, false);
+            }
         }
         break;
     }

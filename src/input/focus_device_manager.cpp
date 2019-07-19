@@ -98,6 +98,7 @@ void device_info_release(FusiDeviceInfo* info){
 
 static void on_focus_search_done(FusiDeviceInfo* device, int length, FusiError* error)
 {
+    bool created = false;
     if(length < 0){
         printf("errorcode : %d\n", length);
     }
@@ -106,14 +107,15 @@ static void on_focus_search_done(FusiDeviceInfo* device, int length, FusiError* 
     }
     else{
         printf("found [%d] devices\n", length);
+        DeviceManager* device_manager = input_manager->getDeviceManager();
         for(int id = 0; id < length; id++){
             printf("device ip[%s] mac[%s] name[%s]\n", device[id].ip, device[id].mac, device[id].name);
             m_fusi_device_info_list.push_back(device[id]);
-            DeviceManager* device_manager = input_manager->getDeviceManager();
             FocusConfig* device_config = NULL;
             if (device_manager->getConfigForFocusDevice(id, device[id].name, &device_config) == true)
             {
                 Log::info("Focus device manager","creating new configuration.");
+                created = true;
             }
             else
             {
@@ -128,6 +130,7 @@ static void on_focus_search_done(FusiDeviceInfo* device, int length, FusiError* 
                                         );
             device_manager->addFocusDevice(focusDevice);
         }
+        if (created) device_manager->save();
     }
     if (focus_device_search_dialog != NULL){
         focus_device_search_dialog->dismiss();

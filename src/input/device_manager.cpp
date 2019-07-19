@@ -749,7 +749,10 @@ void DeviceManager::save()
     {
         m_gamepad_configs[n].save(configfile);
     }
-
+    for(unsigned int n=0; n<m_focus_configs.size(); n++)
+    {
+        m_focus_configs[n].save(configfile);
+    }
     configfile << "</input>\n";
     configfile.close();
     if(UserConfigParams::logMisc()) Log::info("Device manager","Serialization complete.");
