@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<stkgui>
+    <div x="2%" y="1%" width="96%" height="98%" layout="vertical-row" >
+        <header id="title" width="100%" height="fit" text_align="center" word_wrap="true" text="Focus Device Settings" />
+
+        <spacer height="35" width="10" />
+
+        <label width="100%" I18N="In the focus settings screen" text="General"/>
+
+        <div width="75%" layout="horizontal-row" proportion="1">
+            <label proportion="1" align="center" text_align="right" I18N="In the focus settings screen" text="Auto Connect"/>
+            <div proportion="1" align="center" height="fit" layout="horizontal-row" >
+                <spacer width="40" height="10" />
+                <checkbox id="buttons_autoconnect"/>
+            </div>
+        </div>
+
+        <div width="75%" layout="horizontal-row" proportion="1">
+            <label proportion="1" align="center" text_align="right" I18N="In the focus settings screen" text="Low threshold"/>
+            <div proportion="1" align="center" height="fit" layout="horizontal-row" >
+                <spacer width="40" height="10" />
+                <gauge id="low_threshold" proportion="1" min_value="0" max_value="100"/>
+            </div>
+        </div>
+
+        <div width="75%" layout="horizontal-row" proportion="1">
+            <label proportion="1" align="center" text_align="right" I18N="In the focus settings screen" text="High threshold"/>
+            <div proportion="1" align="center" height="fit" layout="horizontal-row" >
+                <spacer width="40" height="10" />
+                <gauge id="high_threshold" proportion="1" min_value="0" max_value="100"/>
+            </div>
+        </div>
+
+        <spacer height="35" width="10"/>
+
+        <div width="fit" height="fit" layout="horizontal-row" align="center" proportion="1">
+            <button id="restore" text="Restore defaults"/>
+            <spacer width="40" height="10" />
+            <button id="connect" text="Connect"/>
+            <spacer width="40" height="10" />
+            <button id="close" text="Apply"/>
+        </div>
+    </div>
+</stkgui>

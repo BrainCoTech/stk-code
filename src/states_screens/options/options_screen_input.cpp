@@ -36,6 +36,7 @@
 #include "states_screens/options/options_screen_ui.hpp"
 #include "states_screens/dialogs/add_device_dialog.hpp"
 #include "states_screens/dialogs/multitouch_settings_dialog.hpp"
+#include "states_screens/dialogs/focus_settings_dialog.hpp"
 #include "states_screens/state_manager.hpp"
 #include "states_screens/options/user_screen.hpp"
 #include "utils/string_utils.hpp"
@@ -302,30 +303,31 @@ void OptionsScreenInput::eventCallback(Widget* widget, const std::string& name, 
         }
         else if (selection.find("focus_device") != std::string::npos)
         {
-            Log::warn("OptionsScreenInput", "[%s] device touched [%s]",selection.c_str(), name.c_str());
-            int i = -1, read = 0;
-            read = sscanf( selection.c_str(), "focus_device%i", &i );
-            if (read == 1 && i != -1)
-            {
-                DeviceManager* dm = input_manager->getDeviceManager();
-                // updateInputButtons( input_manager->getDeviceList()->getKeyboardConfig(i) );
-                if(dm->m_current_focus_device != NULL)
-                {
-                    dm->m_current_focus_device->disconnectDevice();
-                    dm->m_current_focus_device = NULL;
-                }
+            // Log::warn("OptionsScreenInput", "[%s] device touched [%s]",selection.c_str(), name.c_str());
+            // int i = -1, read = 0;
+            // read = sscanf( selection.c_str(), "focus_device%i", &i );
+            // if (read == 1 && i != -1)
+            // {
+            //     DeviceManager* dm = input_manager->getDeviceManager();
+            //     // updateInputButtons( input_manager->getDeviceList()->getKeyboardConfig(i) );
+            //     if(dm->m_current_focus_device != NULL)
+            //     {
+            //         dm->m_current_focus_device->disconnectDevice();
+            //         dm->m_current_focus_device = NULL;
+            //     }
 
-                dm->m_current_focus_device = input_manager->getDeviceManager()->getFocusDevice(i);
-                dm->m_current_focus_device->connectDevice();
-                OptionsScreenDevice::getInstance()
-                    ->setDevice( input_manager->getDeviceManager()->getFocusConfig(i) );
-                StateManager::get()->replaceTopMostScreen(OptionsScreenDevice::getInstance());
-            }
-            else
-            {
-                Log::error("OptionsScreenInput", "Cannot read internal focus input device ID: %s",
-                    selection.c_str());
-            }
+            //     dm->m_current_focus_device = input_manager->getDeviceManager()->getFocusDevice(i);
+            //     dm->m_current_focus_device->connectDevice();
+            //     OptionsScreenDevice::getInstance()
+            //         ->setDevice( input_manager->getDeviceManager()->getFocusConfig(i) );
+            //     StateManager::get()->replaceTopMostScreen(OptionsScreenDevice::getInstance());
+            // }
+            // else
+            // {
+            //     Log::error("OptionsScreenInput", "Cannot read internal focus input device ID: %s",
+            //         selection.c_str());
+            // }
+            new FocusSettingsDialog(0.8f, 0.9f);
         }
         else if (selection.find("touch_device") != std::string::npos)
         {
