@@ -5,6 +5,7 @@ dependencies*/
 CMakeFiles/
 stk-editor/
 .vscode/
+.vs/
 
 .config/
 supertuxkart-64
