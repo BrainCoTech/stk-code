@@ -260,8 +260,8 @@ bool FocusDevice::processAndMapInput(Input::InputType type,  const int id,
             int high_threshold = ((FocusConfig*)m_configuration)->getHighThreshold();
             *action = PlayerAction(PA_FOCUS);
             *value = int(Input::MAX_VALUE * (*value - low_threshold) / (high_threshold - low_threshold));
-            if(*value > 100){
-                *value = 100;
+            if(*value > Input::MAX_VALUE){
+                *value = Input::MAX_VALUE;
             } else if(*value < 0){
                 *value = 0;
             }
