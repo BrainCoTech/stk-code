@@ -27,6 +27,7 @@
 using namespace irr;
 
 #include "states_screens/race_gui_base.hpp"
+#include "fusi_sdk.h"
 
 class AbstractKart;
 class InputMap;
@@ -129,7 +130,16 @@ private:
                                 const core::vector2df &offset,
                                 float min_ratio, int meter_width,
                                 int meter_height, float dt);
-
+    void drawFocusMeter        (const AbstractKart *kart,
+                                const core::recti &viewport,
+                                const core::vector2df &scaling, float dt);
+    void drawFocusScore        (int focusScore,
+                                const core::vector2df &offset,
+                                float min_ratio, int gauge_width,
+                                int gauge_height, float dt);
+    void drawDeviceContactStatus(const AbstractKart* kart,
+                      const core::recti &viewport,
+                      const core::vector2df &scaling);
     /* Helper functions for drawing meters */
 
     void drawMeterTexture(video::ITexture *meter_texture, video::S3DVertex vertices[], unsigned int count);
@@ -142,6 +152,9 @@ private:
     void drawGlobalMiniMap     ();
     void drawGlobalTimer       ();
     void drawLiveDifference    ();
+    void drawScores();
+    
+
 
 public:
 

@@ -21,6 +21,7 @@
 
 #include "config/user_config.hpp"
 #include "input/input_manager.hpp"
+#include "input/focus_device.hpp"
 #include "items/attachment.hpp"
 #include "items/item.hpp"
 #include "items/powerup.hpp"
@@ -47,6 +48,8 @@ PlayerController::PlayerController(AbstractKart *kart)
                 : Controller(kart)
 {
     m_penalty_ticks = 0;
+    m_focus_val = 0;
+    m_device_contact_val = -1;
 }   // PlayerController
 
 //-----------------------------------------------------------------------------
@@ -86,6 +89,17 @@ void PlayerController::resetInputState()
     m_controls->reset();
 }   // resetInputState
 
+static float thresholding_strategy(float value){
+    if(value < 0.3)
+        return 0;
+    else if(value < 0.5)
+        return 0.5;
+    else if(value < 0.7)
+        return 0.7;
+    else
+        return 1.0;
+}
+
 // ----------------------------------------------------------------------------
 /** This function interprets a kart action and value, and set the corresponding
  *  entries in the kart control data structure. This function handles esp.
@@ -111,6 +125,7 @@ void PlayerController::resetInputState()
  */
 bool PlayerController::action(PlayerAction action, int value, bool dry_run)
 {
+    Log::warn("player controller","value %d", value);
     /** If dry_run (parameter) is true, this macro tests if this action would
      *  trigger a state change in the specified variable (without actually
      *  doing it). If it will trigger a state change, the macro will
@@ -174,6 +189,7 @@ bool PlayerController::action(PlayerAction action, int value, bool dry_run)
         break;
     case PA_ACCEL:
     {
+        Log::warn("player controller","[%s] keyboard accel %d", getName().c_str(), value);
         uint16_t v16 = (uint16_t)value;
         SET_OR_TEST(m_prev_accel, v16);
         if (v16)
@@ -243,6 +259,39 @@ bool PlayerController::action(PlayerAction action, int value, bool dry_run)
         break;
     case PA_PAUSE_RACE:
         if (value != 0) StateManager::get()->escapePressed();
+        break;
+    case PA_FOCUS_CONTACT:
+        Log::warn("player controller","[%s] contact state %d",getName().c_str(), value);
+        SET_OR_TEST(m_device_contact_val, value);
+        if(value < 3){
+            SET_OR_TEST(m_focus_val, 0);
+            // This part is copied from PA_ACCEL
+            SET_OR_TEST(m_prev_accel, 0);
+            SET_OR_TEST_GETTER(Accel, 0.0f);
+        }
+        break;
+    case PA_FOCUS:
+        Log::warn("player controller","[%s] focus accel %d",getName().c_str(), value);
+        SET_OR_TEST(m_focus_val, value);
+        // This part is copied from PA_ACCEL
+        SET_OR_TEST(m_prev_accel, value);
+		// Did not find a way to catch brake button released event, check m_prev_brake as a temp solution 
+        if (value && !(m_penalty_ticks > 0) && !(m_prev_brake > 0))
+        {
+            //float adjusted_accel_value = thresholding_strategy(value/32768.0f);
+            float adjusted_accel_value = FocusDevice::thresholding_strategy_3(value*100/32768.0f)/100.0;
+            SET_OR_TEST_GETTER(Accel, adjusted_accel_value);
+            Log::warn("player controller","[%s] focus adjusted accel %f",getName().c_str(), adjusted_accel_value);
+            SET_OR_TEST_GETTER(Brake, false);
+            SET_OR_TEST_GETTER(Nitro, m_prev_nitro);
+        }
+        else
+        {
+            SET_OR_TEST_GETTER(Accel, 0.0f);
+            SET_OR_TEST_GETTER(Brake, m_prev_brake);
+            SET_OR_TEST_GETTER(Nitro, false);
+        }
+        Log::warn("player controller","[%s] focus accel after %d",getName().c_str(), value);
         break;
     default:
        break;

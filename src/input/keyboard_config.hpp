@@ -48,7 +48,9 @@ public:
     virtual bool isGamePadAndroid()  const { return false; }
     // ------------------------------------------------------------------------
     virtual bool isKeyboard() const { return true; }
-
+    // ------------------------------------------------------------------------
+    virtual bool isFocusDevice() const { return false; }
+    
 };   // class KeyboardConfig
 
 #endif

@@ -72,11 +72,11 @@
  online_manager -> "STK Server"
  "STK Server" -> online_manager
  karts -> replay
- replay 
+ replay
  # force karts and tracks on the same level, looks better this way
- subgraph { 
-  rank = same; karts; tracks; 
- } 
+ subgraph {
+  rank = same; karts; tracks;
+ }
 
 }
  \enddot
@@ -200,6 +200,7 @@
 #include "input/input_manager.hpp"
 #include "input/keyboard_device.hpp"
 #include "input/wiimote_manager.hpp"
+#include "input/focus_device_manager.hpp"
 #include "io/file_manager.hpp"
 #include "items/attachment_manager.hpp"
 #include "items/item_manager.hpp"
@@ -323,7 +324,7 @@ void gamepadVisualisation()
 
                     if (evt.PressedDown)
                     {
-                        if (evt.Key == IRR_KEY_RETURN || 
+                        if (evt.Key == IRR_KEY_RETURN ||
                             evt.Key == IRR_KEY_ESCAPE ||
                             evt.Key == IRR_KEY_SPACE)
                         {
@@ -1208,7 +1209,7 @@ int handleCmdLine(bool has_server_config, bool has_parent_process)
 
     if (CommandLine::has("--network-item-debugging"))
         NetworkItemManager::m_network_item_debugging = true;
-    
+
     std::string server_password;
     if (CommandLine::has("--server-password", &s))
     {
@@ -1560,17 +1561,17 @@ int handleCmdLine(bool has_server_config, bool has_parent_process)
             race_manager->setNumLaps(n);
         }
     }   // --profile-laps
-    
+
     if(CommandLine::has("--unlock-all"))
     {
         UserConfigParams::m_unlock_everything = 2;
     } // --unlock-all
-    
+
     if(CommandLine::has("--no-unlock-all"))
     {
         UserConfigParams::m_unlock_everything = 0;
     } // --no-unlock-all
-    
+
     if(CommandLine::has("--profile-time",  &n))
     {
         Log::verbose("main", "Profiling: %d seconds.", n);
@@ -2018,6 +2019,10 @@ int main(int argc, char *argv[])
         wiimote_manager = new WiimoteManager();
 #endif
 
+        focus_device_manager = new FocusDeviceManager();
+
+        // Get into menu mode initially.
+        input_manager->setMode(InputManager::MENU);
         int parent_pid;
         bool has_parent_process = false;
         if (CommandLine::has("--parent-process", &parent_pid))
@@ -2138,7 +2143,7 @@ int main(int argc, char *argv[])
                 }
                 Log::warn("main", "Screen size is too small!");
             }
-            
+
             #ifdef MOBILE_STK
             if (UserConfigParams::m_multitouch_controls == MULTITOUCH_CONTROLS_UNDEFINED)
             {
@@ -2319,6 +2324,9 @@ int main(int argc, char *argv[])
     if(wiimote_manager)
         delete wiimote_manager;
 #endif
+
+    if(focus_device_manager)
+        delete focus_device_manager;
 
     // If the window was closed in the middle of a race, remove players,
     // so we don't crash later when StateManager tries to access input devices.

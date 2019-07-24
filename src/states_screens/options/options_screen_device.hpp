@@ -50,6 +50,7 @@ class OptionsScreenDevice : public GUIEngine::Screen,
 
     /** The configuration to use. */
     DeviceConfig* m_config;
+    int m_last_contact_state;
 
     void renameRow(GUIEngine::ListWidget* actions,
         int idRow,

@@ -304,6 +304,8 @@ Section "Uninstall" redist
   DELETE /REBOOTOK "$INSTDIR\wiiuse.ilk"
   DELETE /REBOOTOK "$INSTDIR\wiiuse.pdb"
   DELETE /REBOOTOK "$INSTDIR\wrap_oal.dll"
+  DELETE /REBOOTOK "$INSTDIR\libfusi.dll"
+  DELETE /REBOOTOK "$INSTDIR\psapi.dll"
   DELETE /REBOOTOK "$INSTDIR\zlib.dll"
   DELETE /REBOOTOK "$INSTDIR\zlib.pdb"
   DELETE /REBOOTOK "$INSTDIR\zlib1.dll"

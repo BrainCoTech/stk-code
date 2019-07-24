@@ -32,6 +32,7 @@
 #include "input/keyboard_device.hpp"
 #include "input/multitouch_device.hpp"
 #include "input/wiimote_manager.hpp"
+#include "input/focus_device_manager.hpp"
 #include "karts/controller/controller.hpp"
 #include "karts/abstract_kart.hpp"
 #include "modes/demo_world.hpp"
@@ -84,6 +85,7 @@ InputManager::InputManager() : m_mode(BOOTSTRAP),
     m_timer_in_use = false;
     m_master_player_only = false;
     m_timer = 0;
+    m_device_contact_val = -1;
 
 }
 // -----------------------------------------------------------------------------
@@ -93,6 +95,9 @@ void InputManager::update(float dt)
     if (wiimote_manager)
         wiimote_manager->update();
 #endif
+
+    // update focus device
+    focus_device_manager->update();
 
     if(m_timer_in_use)
     {
@@ -579,6 +584,7 @@ void InputManager::inputSensing(Input::InputType type, int deviceID,
         case Input::IT_NONE:
         case Input::IT_MOUSEMOTION:
         case Input::IT_MOUSEBUTTON:
+        case Input::IT_FOCUS:
             // uninteresting (but we keep them here to explicitely state we do
             // nothing with them, and thus to fix warnings)
             break;
@@ -620,11 +626,33 @@ int InputManager::getPlayerKeyboardID() const
  * Note: It is the obligation of the called menu to switch of the sense mode.
  *
  */
+#include "guiengine/widget.hpp"
+#include "guiengine/widgets/button_widget.hpp"
+#include "guiengine/widgets/label_widget.hpp"
+#include "guiengine/widgets/list_widget.hpp"
+#include "guiengine/widgets/ribbon_widget.hpp"
+
+using namespace GUIEngine;
+
 void InputManager::dispatchInput(Input::InputType type, int deviceID,
                                  int button,
                                  Input::AxisDirection axisDirection, int value,
                                  bool shift_mask)
 {
+    if (type == Input::IT_FOCUS){
+        if(m_device_contact_val < 3)
+            m_device_contact_val = 3;
+    }
+    else if (type == Input::IT_FOCUS_CONTACT)
+    {
+        Log::warn("input manager","contact state change to [%d]", value);
+        m_device_contact_val = value;
+        // update widget label
+        //ButtonWidget* delete_button = getWidget<ButtonWidget>("delete");
+        //std::ostringstream oss;
+        //oss << value;
+        //delete_button->setLabel(oss.str().c_str());
+    }
     // Act different in input sensing mode.
     if (m_mode == INPUT_SENSE_KEYBOARD ||
         m_mode == INPUT_SENSE_GAMEPAD)
@@ -708,7 +736,7 @@ void InputManager::dispatchInput(Input::InputType type, int deviceID,
             player = NULL;
         }
     }
-
+    
     // do something with the key if it matches a binding
     if (action_found)
     {
@@ -804,6 +832,8 @@ void InputManager::dispatchInput(Input::InputType type, int deviceID,
              !GUIEngine::ScreenKeyboard::isActive()                &&
              !race_manager->isWatchingReplay() && !is_nw_spectator)
         {
+            Log::warn("Input Manager", "Input from type %d, deviceId %d, button %d, value %d, action %d",
+             type, deviceID, button, value, action);
             if (player == NULL)
             {
                 // Prevent null pointer crash
@@ -819,7 +849,8 @@ void InputManager::dispatchInput(Input::InputType type, int deviceID,
                     "action for an unknown player");
                 return;
             }
-
+            Log::warn("Input Manager", "Input from type %d, deviceId %d, button %d, value %d, action %d",
+            type, deviceID, button, value, action);
             Controller* controller = pk->getController();
             if (controller != NULL) controller->action(action, abs(value));
         }
@@ -1019,6 +1050,16 @@ EventPropagation InputManager::input(const SEvent& event)
             gp->setButtonPressed(i, isButtonPressed);
         }
 
+    }
+    else if (event.EventType == EET_USER_EVENT)
+    {
+        Log::info("InputManager", "user event: UserData1 %d, UserData2 %d", event.UserEvent.UserData1, event.UserEvent.UserData2);
+        if(event.UserEvent.type == Input::IT_FOCUS_CONTACT)
+            dispatchInput(Input::IT_FOCUS_CONTACT, event.UserEvent.UserData1, 0,
+                      Input::AD_POSITIVE, event.UserEvent.UserData2);
+        else if(event.UserEvent.type == Input::IT_FOCUS)
+            dispatchInput(Input::IT_FOCUS, event.UserEvent.UserData1, 0,
+                      Input::AD_POSITIVE, event.UserEvent.UserData2);
     }
     else if (event.EventType == EET_KEY_INPUT_EVENT)
     {
