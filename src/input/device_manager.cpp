@@ -276,6 +276,20 @@ bool DeviceManager::getConfigForFocusDevice(const int focus_device_id,
     return configCreated;
 }
 
+FocusDevice* DeviceManager::getFocusDeviceByName(const std::string& name){
+    const int count = m_focus_devices.size();
+    for (int i = 0; i < count; i++)
+    {
+        Log::info("DeviceManager", "looking at config device ID: %s",
+                    m_focus_devices[i].getName().c_str());
+        if (m_focus_devices[i].getName() == name)
+        {
+            return m_focus_devices.get(i);
+        }
+    }
+    return NULL;
+}
+
 // -----------------------------------------------------------------------------
 /**
  * Check if we already have a config object for gamepad 'irr_id' as reported by

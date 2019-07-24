@@ -164,10 +164,6 @@ void OptionsScreenDevice::init()
     LabelWidget* label = getWidget<LabelWidget>("title");
     label->setText( m_config->getName().c_str(), false );
 
-    if (!m_config->isFocusDevice())
-    {
-    // original source code: don't indent
-
     // ---- create list skeleton (right number of items, right internal names)
     //      their actualy contents will be adapted as needed after
 
@@ -203,20 +199,10 @@ void OptionsScreenDevice::init()
     actions->setFocusForPlayer(PLAYER_ID_GAME_MASTER);
     actions->setSelectionID(0);
 
-    // original source code: end
-    }
-    else
-    {
-        ListWidget* actions = getWidget<GUIEngine::ListWidget>("actions");
-        assert( actions != NULL );
-        actions->setVisible(false);
-    }
-
-    
 
     // Disable deleting or disabling configuration mid-race
     bool in_game = StateManager::get()->getGameState() == GUIEngine::INGAME_MENU;
-    
+
     if (in_game)
     {
         delete_button->setActive(false);
@@ -410,7 +396,7 @@ void OptionsScreenDevice::updateInputButtons()
 
         }   // if existing key
     }   // for action <= PA_LAST_MENU_ACTION;
-    
+
 
     GUIEngine::Widget* conflict_label =
         getWidget<GUIEngine::LabelWidget>("conflict");

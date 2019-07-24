@@ -117,24 +117,28 @@ static void on_focus_search_done(FusiDeviceInfo* device, int length, FusiError* 
                 Log::info("Focus device manager","creating new configuration.");
                 created = true;
             }
-            else
-            {
-                Log::info("Focus device manager","using existing configuration.");
-            }
 
             FocusDevice* focusDevice = NULL;
             FusiDeviceInfo* focusDeviceInfo = device_info_deep_copy(&device[id]);
+            device_config->setPlugged();
             focusDevice = new FocusDevice(id,
                                           focusDeviceInfo,
                                           device_config
                                         );
             device_manager->addFocusDevice(focusDevice);
+            if(device_config->getAutoConnect()){
+                if(device_manager->m_current_focus_device != NULL){
+                    device_manager->m_current_focus_device->disconnectDevice();
+                    device_manager->m_current_focus_device = NULL;
+                }
+                device_manager->m_current_focus_device = focusDevice;
+                device_manager->m_current_focus_device->connectDevice();
+            }
         }
         if (created) device_manager->save();
     }
     if (focus_device_search_dialog != NULL){
         focus_device_search_dialog->dismiss();
-        Log::info("Focus device manager","2");
         ((OptionsScreenInput*)GUIEngine::getCurrentScreen())->rebuildDeviceList();
     }
 }

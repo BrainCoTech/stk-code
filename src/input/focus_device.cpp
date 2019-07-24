@@ -18,7 +18,7 @@ FocusDevice::FocusDevice(const int focus_device_id, FusiDeviceInfo* focus_device
     m_focus_device  = NULL;
     m_configuration = configuration;
     m_type          = DT_FOCUS;
-    m_name          = "Focus";
+    m_name          = configuration->getName();
     m_player        = NULL;
 }   // FocusDevice
 
@@ -250,15 +250,22 @@ bool FocusDevice::processAndMapInput(Input::InputType type,  const int id,
                                         InputManager::InputDriverMode mode,
                                         PlayerAction *action, int* value)
 {
-	Log::info("Focus device", "processAndMapInput mode and type %d %d", mode, type);
     // bindings can only be accessed in game
     if (mode == InputManager::INGAME)
     {
         if(type == Input::IT_FOCUS)
         {
             //return m_configuration->getGameAction(Input::IT_FOCUS, id, value, action);
+            int low_threshold = ((FocusConfig*)m_configuration)->getLowThreshold();
+            int high_threshold = ((FocusConfig*)m_configuration)->getHighThreshold();
             *action = PlayerAction(PA_FOCUS);
-            *value = int(Input::MAX_VALUE * (*value) / 100);
+            *value = int(Input::MAX_VALUE * (*value - low_threshold) / (high_threshold - low_threshold));
+            if(*value > 100){
+                *value = 100;
+            } else if(*value < 0){
+                *value = 0;
+            }
+            Log::info("Focus device", "processAndMapInput value %d", low_threshold);
 			return true;
         }
 		if (type == Input::IT_FOCUS_CONTACT)
