@@ -15,6 +15,10 @@
 class FocusConfig : public DeviceConfig
 {
 
+private:
+    bool m_auto_connect;
+    int m_low_threshold;
+    int m_high_threshold;
 public:
 
                 FocusConfig();
@@ -22,8 +26,15 @@ public:
     virtual    ~FocusConfig() {}
 
     virtual void setDefaultBinds();
-    virtual void save(std::ofstream& stream);
+    bool getAutoConnect() const { return m_auto_connect; }
+    void setAutoConnect(bool auto_connect) { m_auto_connect = auto_connect; }
+    int getLowThreshold() const { return m_low_threshold; }
+    void setLowThreshold(int low_threshold) { m_low_threshold = low_threshold; }
+    int getHighThreshold() const { return m_high_threshold; }
+    void setHighThreshold(int high_threshold) { m_high_threshold = high_threshold; }
 
+    virtual void save(std::ofstream& stream);
+    virtual bool load(const XMLNode *config);
     // ------------------------------------------------------------------------
     virtual bool isGamePad()  const { return false; }
     // ------------------------------------------------------------------------

@@ -164,50 +164,40 @@ void OptionsScreenDevice::init()
     LabelWidget* label = getWidget<LabelWidget>("title");
     label->setText( m_config->getName().c_str(), false );
 
-    if (!m_config->isFocusDevice())
-    {
-        // ---- create list skeleton (right number of items, right internal names)
-        //      their actualy contents will be adapted as needed after
+    // ---- create list skeleton (right number of items, right internal names)
+    //      their actualy contents will be adapted as needed after
 
-        ListWidget* actions = getWidget<GUIEngine::ListWidget>("actions");
-        assert( actions != NULL );
+    ListWidget* actions = getWidget<GUIEngine::ListWidget>("actions");
+    assert( actions != NULL );
 
-        //I18N: Key binding section
-        addListItemSubheader(actions, "game_keys_section", _("Game Keys"));
-        addListItem(actions, PA_STEER_LEFT);
-        addListItem(actions, PA_STEER_RIGHT);
-        addListItem(actions, PA_ACCEL);
-        addListItem(actions, PA_BRAKE);
-        addListItem(actions, PA_FIRE);
-        addListItem(actions, PA_NITRO);
-        addListItem(actions, PA_DRIFT);
-        addListItem(actions, PA_LOOK_BACK);
-        addListItem(actions, PA_RESCUE);
-        addListItem(actions, PA_PAUSE_RACE);
+    //I18N: Key binding section
+    addListItemSubheader(actions, "game_keys_section", _("Game Keys"));
+    addListItem(actions, PA_STEER_LEFT);
+    addListItem(actions, PA_STEER_RIGHT);
+    addListItem(actions, PA_ACCEL);
+    addListItem(actions, PA_BRAKE);
+    addListItem(actions, PA_FIRE);
+    addListItem(actions, PA_NITRO);
+    addListItem(actions, PA_DRIFT);
+    addListItem(actions, PA_LOOK_BACK);
+    addListItem(actions, PA_RESCUE);
+    addListItem(actions, PA_PAUSE_RACE);
 
 
-        //I18N: Key binding section
-        addListItemSubheader(actions, "menu_keys_section", _("Menu Keys"));
-        addListItem(actions, PA_MENU_UP);
-        addListItem(actions, PA_MENU_DOWN);
-        addListItem(actions, PA_MENU_LEFT);
-        addListItem(actions, PA_MENU_RIGHT);
-        addListItem(actions, PA_MENU_SELECT);
-        addListItem(actions, PA_MENU_CANCEL);
+    //I18N: Key binding section
+    addListItemSubheader(actions, "menu_keys_section", _("Menu Keys"));
+    addListItem(actions, PA_MENU_UP);
+    addListItem(actions, PA_MENU_DOWN);
+    addListItem(actions, PA_MENU_LEFT);
+    addListItem(actions, PA_MENU_RIGHT);
+    addListItem(actions, PA_MENU_SELECT);
+    addListItem(actions, PA_MENU_CANCEL);
 
-        updateInputButtons();
+    updateInputButtons();
 
-        // Focus the list and select its first item
-        actions->setFocusForPlayer(PLAYER_ID_GAME_MASTER);
-        actions->setSelectionID(0);
-    }
-    else
-    {
-        ListWidget* actions = getWidget<GUIEngine::ListWidget>("actions");
-        assert( actions != NULL );
-        actions->setVisible(false);
-    }
-
+    // Focus the list and select its first item
+    actions->setFocusForPlayer(PLAYER_ID_GAME_MASTER);
+    actions->setSelectionID(0);
     
 
     // Disable deleting or disabling configuration mid-race

@@ -31,16 +31,39 @@ FocusConfig::FocusConfig( const std::string &name )
              : DeviceConfig()
 {
     setName(name);
-    setDefaultBinds();
-}   // GamepadConfig
+    m_auto_connect = false;
+    m_low_threshold = 30;
+    m_high_threshold = 70;
+}   // FocusConfig
 
 
 FocusConfig::FocusConfig() 
               : DeviceConfig()
 {
-    setDefaultBinds();
-    setPlugged();
+    m_auto_connect = false;
+    m_low_threshold = 30;
+    m_high_threshold = 70;
 }   // FocusConfig
+
+//------------------------------------------------------------------------------
+/** Loads this configuration from the given XML node.
+ *  \param config The XML tree.
+ *  \return False in case of an error.
+ */
+bool FocusConfig::load(const XMLNode *config)
+{
+    config->get("low_threshold",        &m_low_threshold);
+    config->get("high_threshold",       &m_high_threshold);
+    config->get("auto_connect",  &m_auto_connect);
+    bool ok = DeviceConfig::load(config);
+
+    if(getName()=="")
+    {
+        Log::error("FocusConfig", "Unnamed focus device in config file.");
+        return false;
+    }
+    return ok;
+}   // load
 
 // ----------------------------------------------------------------------------
 /** Saves the configuration to a file. It writes the name for a gamepad
@@ -51,9 +74,9 @@ FocusConfig::FocusConfig()
 void FocusConfig::save(std::ofstream& stream)
 {
     stream << "<focus name =\"" << getName()
-           << "\" deadzone=\""    << getName()
-           << "\" desensitize=\"" << getName()
-           << "\" analog=\""      << getName()<<"\"\n";
+           << "\" auto_connect=\""    << m_auto_connect
+           << "\" low_threshold=\""    << m_low_threshold
+           << "\" high_threshold=\""      << m_high_threshold <<"\"\n";
     stream << "         ";
     DeviceConfig::save(stream);
     stream << "</focus>\n\n";

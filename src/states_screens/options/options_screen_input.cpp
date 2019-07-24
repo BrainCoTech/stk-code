@@ -151,22 +151,26 @@ void OptionsScreenInput::buildDeviceList()
     {
         FocusConfig *config = device_manager->getFocusConfig(i);
         
-        irr::core::stringw name = ("   " + config->getName()).c_str();
-
-        if (config->getNumberOfDevices() > 1)
+        // Don't display the configuration if a matching device is not available
+        if (config->isPlugged())
         {
-            name += core::stringw(L" (x");
-            name += config->getNumberOfDevices();
-            name += core::stringw(L")");
+            irr::core::stringw name = ("   " + config->getName()).c_str();
+
+            if (config->getNumberOfDevices() > 1)
+            {
+                name += core::stringw(L" (x");
+                name += config->getNumberOfDevices();
+                name += core::stringw(L")");
+            }
+
+            std::ostringstream fdname;
+            fdname << "focus_device" << i;
+            const std::string internal_name = fdname.str();
+
+            const int icon = (config->isEnabled() ? 1 : 2);
+
+            devices->addItem(internal_name, name, icon);
         }
-
-        std::ostringstream fdname;
-        fdname << "focus_device" << i;
-        const std::string internal_name = fdname.str();
-
-        const int icon = (config->isEnabled() ? 1 : 2);
-
-        devices->addItem(internal_name, name, icon);
     }
 
     MultitouchDevice* touch_device = device_manager->getMultitouchDevice();
@@ -327,7 +331,18 @@ void OptionsScreenInput::eventCallback(Widget* widget, const std::string& name, 
             //     Log::error("OptionsScreenInput", "Cannot read internal focus input device ID: %s",
             //         selection.c_str());
             // }
-            new FocusSettingsDialog(0.8f, 0.9f);
+            int i = -1, read = 0;
+            read = sscanf( selection.c_str(), "focus_device%i", &i );
+            if (read == 1 && i != -1)
+            {
+                new FocusSettingsDialog(0.8f, 0.9f, input_manager->getDeviceManager()->getFocusConfig(i));
+            }
+            else
+            {
+                Log::error("OptionsScreenInput", "Cannot read internal focus input device ID: %s",
+                    selection.c_str());
+            }
+            
         }
         else if (selection.find("touch_device") != std::string::npos)
         {

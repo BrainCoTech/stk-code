@@ -133,6 +133,7 @@ public:
     int getFocusConfigAmount() const                        { return m_focus_configs.size(); }
     FocusDevice*        getFocusDevice(const int i)          { return m_focus_devices.get(i); }
     FocusConfig*        getFocusConfig(const int i)          { return m_focus_configs.get(i); }
+    FocusDevice*        getFocusDeviceByName(const std::string& name);  
     void                clearFocusDevices();
     bool                getConfigForFocusDevice(const int sdl_id, 
                                                 const std::string& name,
