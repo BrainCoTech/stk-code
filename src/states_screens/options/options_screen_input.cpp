@@ -144,6 +144,30 @@ void OptionsScreenInput::buildDeviceList()
         }   // if config->isPlugged
     }   // for i<gpad_config_count
     
+    const int focus_device_config_count = device_manager->getFocusConfigAmount();
+    Log::info("Option screen input focus config count ", "%d detected...", focus_device_config_count);
+    for (int i = 0; i < focus_device_config_count; i++)
+    {
+        FocusConfig *config = device_manager->getFocusConfig(i);
+        
+        irr::core::stringw name = ("   " + config->getName()).c_str();
+
+        if (config->getNumberOfDevices() > 1)
+        {
+            name += core::stringw(L" (x");
+            name += config->getNumberOfDevices();
+            name += core::stringw(L")");
+        }
+
+        std::ostringstream fdname;
+        fdname << "focus_device" << i;
+        const std::string internal_name = fdname.str();
+
+        const int icon = (config->isEnabled() ? 1 : 2);
+
+        devices->addItem(internal_name, name, icon);
+    }
+
     MultitouchDevice* touch_device = device_manager->getMultitouchDevice();
                                                         
     if (touch_device != NULL)
@@ -273,6 +297,33 @@ void OptionsScreenInput::eventCallback(Widget* widget, const std::string& name, 
             else
             {
                 Log::error("OptionsScreenInput", "Cannot read internal keyboard input device ID: %s",
+                    selection.c_str());
+            }
+        }
+        else if (selection.find("focus_device") != std::string::npos)
+        {
+            Log::warn("OptionsScreenInput", "[%s] device touched [%s]",selection.c_str(), name.c_str());
+            int i = -1, read = 0;
+            read = sscanf( selection.c_str(), "focus_device%i", &i );
+            if (read == 1 && i != -1)
+            {
+                DeviceManager* dm = input_manager->getDeviceManager();
+                // updateInputButtons( input_manager->getDeviceList()->getKeyboardConfig(i) );
+                if(dm->m_current_focus_device != NULL)
+                {
+                    dm->m_current_focus_device->disconnectDevice();
+                    dm->m_current_focus_device = NULL;
+                }
+
+                dm->m_current_focus_device = input_manager->getDeviceManager()->getFocusDevice(i);
+                dm->m_current_focus_device->connectDevice();
+                OptionsScreenDevice::getInstance()
+                    ->setDevice( input_manager->getDeviceManager()->getFocusConfig(i) );
+                StateManager::get()->replaceTopMostScreen(OptionsScreenDevice::getInstance());
+            }
+            else
+            {
+                Log::error("OptionsScreenInput", "Cannot read internal focus input device ID: %s",
                     selection.c_str());
             }
         }

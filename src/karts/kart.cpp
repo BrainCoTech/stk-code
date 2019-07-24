@@ -2838,6 +2838,8 @@ void Kart::updateEnginePowerAndBrakes(int ticks)
             m_kart_properties->getSkidVisualTime() == 0)
             engine_power *= 0.5f;
 
+        //Log::warn("kart","[%f]apply engine force %f with accel %f",engine_power*m_controls.getAccel(), engine_power, m_controls.getAccel());
+        
         // This also applies parachute physics if relevant
         engine_power = applyAirFriction(engine_power);
 

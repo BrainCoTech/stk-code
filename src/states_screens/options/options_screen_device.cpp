@@ -53,6 +53,7 @@ using namespace GUIEngine;
 OptionsScreenDevice::OptionsScreenDevice() : Screen("options_device.stkgui")
 {
     m_config = NULL;
+    m_last_contact_state = 0;
 }   // OptionsScreenDevice
 
 // ----------------------------------------------------------------------------
@@ -163,6 +164,10 @@ void OptionsScreenDevice::init()
     LabelWidget* label = getWidget<LabelWidget>("title");
     label->setText( m_config->getName().c_str(), false );
 
+    if (!m_config->isFocusDevice())
+    {
+    // original source code: don't indent
+
     // ---- create list skeleton (right number of items, right internal names)
     //      their actualy contents will be adapted as needed after
 
@@ -197,6 +202,17 @@ void OptionsScreenDevice::init()
     // Focus the list and select its first item
     actions->setFocusForPlayer(PLAYER_ID_GAME_MASTER);
     actions->setSelectionID(0);
+
+    // original source code: end
+    }
+    else
+    {
+        ListWidget* actions = getWidget<GUIEngine::ListWidget>("actions");
+        assert( actions != NULL );
+        actions->setVisible(false);
+    }
+
+    
 
     // Disable deleting or disabling configuration mid-race
     bool in_game = StateManager::get()->getGameState() == GUIEngine::INGAME_MENU;
@@ -535,7 +551,7 @@ void OptionsScreenDevice::eventCallback(Widget* widget,
                                        const int playerID)
 {
     //const std::string& screen_name = getName();
-
+    Log::warn("options screeen device", "event name [%s] playerID [%d]", name.c_str(), playerID);
     StateManager *sm = StateManager::get();
     if (name == "options_choice")
     {
@@ -636,6 +652,21 @@ void OptionsScreenDevice::eventCallback(Widget* widget,
         }
 
         input_manager->getDeviceManager()->save();
+    }
+
+    else if(name == "contact_state")
+    {
+        // update widget label
+        if(m_last_contact_state == 5){
+            Log::warn("options screen device", "contact state already reach to 5");
+        }
+        else{
+            std::ostringstream oss;
+            oss << playerID;
+            m_last_contact_state = playerID;
+            ButtonWidget* delete_button = getWidget<ButtonWidget>("delete");
+            delete_button->setLabel(oss.str().c_str());
+        }
     }
 
 }   // eventCallback

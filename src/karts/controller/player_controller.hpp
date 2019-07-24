@@ -20,6 +20,8 @@
 #define HEADER_PLAYER_CONTROLLER_HPP
 
 #include "karts/controller/controller.hpp"
+#include "karts/controller/kart_control.hpp"
+#include "input/input_manager.hpp"
 
 class AbstractKart;
 class Player;
@@ -32,6 +34,9 @@ protected:
     uint16_t       m_prev_accel;
     bool           m_prev_brake;
     bool           m_prev_nitro;
+
+    int            m_focus_val;
+    int            m_device_contact_val = -1;
 
     int            m_penalty_ticks;
 
@@ -95,6 +100,17 @@ public:
     /** Called when this kart started too early and got a start penalty. */
     virtual void  displayPenaltyWarning();
 
+    int getFocusValue() const OVERRIDE {
+        /*
+        if(input_manager->getDeviceContactValue() < 3){
+            m_controls->setAccel(0);  
+            m_focus_val = 0;
+            m_prev_accel = 0;
+        }*/
+
+        return m_focus_val;
+    }
+    int getDeviceContactValue() const OVERRIDE { return input_manager->getDeviceContactValue(); }
 };   // class PlayerController
 
 #endif // HEADER_PLAYER_CONTROLLER_HPP

@@ -26,6 +26,8 @@
 #include "input/gamepad_android_config.hpp"
 #include "input/gamepad_device.hpp"
 #include "input/keyboard_device.hpp"
+#include "input/focus_device.hpp"
+#include "input/focus_device_manager.hpp"
 #include "input/multitouch_device.hpp"
 #include "input/wiimote_manager.hpp"
 #include "io/file_manager.hpp"
@@ -47,6 +49,7 @@ DeviceManager::DeviceManager()
     m_assign_mode = NO_ASSIGN;
     m_single_player = NULL;
     m_multitouch_device = NULL;
+    m_current_focus_device = NULL;
 }   // DeviceManager
 
 // -----------------------------------------------------------------------------
@@ -176,6 +179,7 @@ bool DeviceManager::initialize()
         m_multitouch_device = new MultitouchDevice();
     }
 
+    focus_device_manager->searchFocusDevices();
     if (created) save();
 
     return created;
@@ -241,6 +245,36 @@ GamePadDevice* DeviceManager::getGamePadFromIrrID(const int id)
     }
     return NULL;
 }   // getGamePadFromIrrID
+
+bool DeviceManager::getConfigForFocusDevice(const int focus_device_id, 
+                                            const std::string& name,
+                                            FocusConfig **config)
+{
+    bool found = false;
+    bool configCreated = false;
+
+    // Find appropriate configuration
+    for(unsigned int n=0; n < m_focus_configs.size(); n++)
+    {
+        if(m_focus_configs[n].getName() == name)
+        {
+            *config = m_focus_configs.get(n);
+            found = true;
+        }
+    }
+
+    // If we can't find an appropriate configuration then create one.
+    if (!found)
+    {
+        *config = new FocusConfig( name );
+
+        // Add new config to list
+        m_focus_configs.push_back(*config);
+        configCreated = true;
+    }
+
+    return configCreated;
+}
 
 // -----------------------------------------------------------------------------
 /**
@@ -309,6 +343,13 @@ void DeviceManager::addEmptyKeyboard()
 void DeviceManager::addGamepad(GamePadDevice* d)
 {
     m_gamepads.push_back(d);
+}   // addGamepad
+
+// -----------------------------------------------------------------------------
+
+void DeviceManager::addFocusDevice(FocusDevice* d)
+{
+    m_focus_devices.push_back(d);
 }   // addGamepad
 
 // -----------------------------------------------------------------------------
@@ -446,6 +487,38 @@ InputDevice *DeviceManager::mapGamepadInput(Input::InputType type,
     return gPad;
 }   // mapGamepadInput
 
+// -----------------------------------------------------------------------------
+/** Helper method, only used internally. Takes care of analyzing focus device input.
+ */
+InputDevice* DeviceManager::mapFocusDeviceInput(Input::InputType type,
+                                                int device_id,
+                                                int button_id,
+                                                int *value,
+                                                InputManager::InputDriverMode mode,
+                                                StateManager::ActivePlayer **player,
+                                                PlayerAction *action /* out */)
+{
+    FocusDevice *focusDevice = m_focus_devices.get(device_id);
+
+    if (focusDevice->processAndMapInput(type, device_id, mode, action, value))
+    {
+        if (m_single_player != NULL)
+        {
+            *player = m_single_player;
+        }
+        else if (m_assign_mode == NO_ASSIGN) // Don't set the player in NO_ASSIGN mode
+        {
+            *player = NULL;
+        }
+        else
+        {
+            *player = focusDevice->getPlayer();
+        }
+        return focusDevice;
+    }
+    return NULL; // no appropriate binding found
+}   // mapKeyboardInput
+
 //-----------------------------------------------------------------------------
 
 void DeviceManager::updateMultitouchDevice()
@@ -511,6 +584,11 @@ bool DeviceManager::translateInput( Input::InputType type,
                 if(device && *action == PA_FIRE)
                     *action = PA_MENU_SELECT;
             }
+            break;
+        case Input::IT_FOCUS:
+        case Input::IT_FOCUS_CONTACT:
+            device = mapFocusDeviceInput(type, device_id, button_id, value,
+                                         mode, player, action);
             break;
         default:
             break;
@@ -604,6 +682,11 @@ bool DeviceManager::load()
         {
             GamepadConfig *gc = static_cast<GamepadConfig*>(device_config);
             m_gamepad_configs.push_back(gc);
+        }
+        else if (config->getName() == "focus")
+        {
+            FocusConfig *fc = static_cast<FocusConfig*>(device_config);
+            m_focus_configs.push_back(fc);
         }
     }   // for i < getNumNodes
 

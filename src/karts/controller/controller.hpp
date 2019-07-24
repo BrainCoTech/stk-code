@@ -30,6 +30,7 @@ class BareNetworkString;
   */
 
 #include "input/input.hpp"
+#include "input/input_manager.hpp"
 #include "states_screens/state_manager.hpp"
 
 class AbstractKart;
@@ -115,6 +116,10 @@ public:
     // ------------------------------------------------------------------------
     /** Returns the kart controlled by this controller. */
     AbstractKart *getKart() const { return m_kart; }
+    // ------------------------------------------------------------------------
+    /** Returns the focus value. */
+    virtual int getFocusValue() const { return -1; };
+    virtual int getDeviceContactValue() const {return input_manager->getDeviceContactValue(); };
 };   // Controller
 
 #endif

@@ -68,6 +68,7 @@ protected:
     /** Those two classes need to be able to call getGameAction. */
     friend class GamePadDevice;
     friend class KeyboardDevice;
+    friend class FocusDevice;
     bool getGameAction(Input::InputType       type,
                        const int              id,
                        int*                   value, /* inout */
@@ -97,6 +98,7 @@ public:
     virtual bool isGamePad()  const = 0;
     virtual bool isGamePadAndroid()  const = 0;
     virtual bool isKeyboard() const = 0;
+    virtual bool isFocusDevice() const = 0;
 
     virtual void save(std::ofstream& stream);
     virtual bool load(const XMLNode *config);

@@ -229,6 +229,7 @@ namespace Scripting
             engine->RegisterEnumValue("PlayerAction", "MENU_RIGHT", PA_MENU_RIGHT);
             engine->RegisterEnumValue("PlayerAction", "MENU_SELECT", PA_MENU_SELECT);
             engine->RegisterEnumValue("PlayerAction", "MENU_CANCEL", PA_MENU_CANCEL);
+            engine->RegisterEnumValue("PlayerAction", "FOCUS", PA_FOCUS);
         }
     }
 

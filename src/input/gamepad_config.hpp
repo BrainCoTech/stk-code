@@ -108,7 +108,8 @@ public:
     virtual bool isGamePadAndroid()  const OVERRIDE { return false; }
     // ------------------------------------------------------------------------
     virtual bool isKeyboard() const OVERRIDE { return false; }
-
+    // ------------------------------------------------------------------------
+    virtual bool isFocusDevice() const OVERRIDE { return false; }
 };   // class GamepadConfig
 
 #endif

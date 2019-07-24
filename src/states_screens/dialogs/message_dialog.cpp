@@ -141,6 +141,12 @@ void MessageDialog::loadedFromFile()
         if (m_focus_on_cancel)
             cancelbtn->setFocusForPlayer(PLAYER_ID_GAME_MASTER);
     }
+    else if (m_type == MessageDialog::MESSAGE_DIALOG_WAIT)
+    {
+        // In case of a WAIT dialog, hide the "Yes" button
+        IconButtonWidget* yesbtn = getWidget<IconButtonWidget>("confirm");
+         yesbtn->setVisible(false);
+    }
 }
 
 // ----------------------------------------------------------------------------
