@@ -11,7 +11,7 @@
             <label proportion="1" align="center" text_align="right" I18N="In the focus settings screen" text="Auto Connect"/>
             <div proportion="1" align="center" height="fit" layout="horizontal-row" >
                 <spacer width="40" height="10" />
-                <checkbox id="buttons_autoconnect"/>
+                <checkbox id="auto_connect"/>
             </div>
         </div>
 

@@ -32,16 +32,26 @@
 
 
 using namespace GUIEngine;
-using namespace irr;
-using namespace irr::core;
-using namespace irr::gui;
 
 // -----------------------------------------------------------------------------
 
-FocusSettingsDialog::FocusSettingsDialog(const float w, const float h)
+FocusSettingsDialog::FocusSettingsDialog(const float w, const float h, FocusConfig* config)
         : ModalDialog(w, h)
 {
     loadFromFile("focus_settings_dialog.stkgui");
+    Log::error("FocusSettingsDialog", "working on config device ID: %s",
+                    config->getName().c_str());
+    m_focus_device = input_manager->getDeviceManager()->getFocusDeviceByName(config->getName());
+    m_focus_config = config;
+    m_auto_connect_checkbox = getWidget<CheckBoxWidget>("auto_connect");
+    assert(m_auto_connect_checkbox != NULL);
+    m_auto_connect_checkbox->setState(m_focus_config->getAutoConnect());
+    m_low_threshold_slider = getWidget<SpinnerWidget>("low_threshold");
+    assert(m_low_threshold_slider != NULL);
+    m_low_threshold_slider->setValue(m_focus_config->getLowThreshold());
+    m_high_threshold_slider = getWidget<SpinnerWidget>("high_threshold");
+    assert(m_high_threshold_slider != NULL);
+    m_high_threshold_slider->setValue(m_focus_config->getHighThreshold());
 }
 
 // -----------------------------------------------------------------------------
@@ -60,8 +70,6 @@ void FocusSettingsDialog::beforeAddingWidgets()
         assert(buttons_en != NULL);
         buttons_en->setActive(false);
     }
-
-    updateValues();
 }
 
 // -----------------------------------------------------------------------------
@@ -72,17 +80,27 @@ GUIEngine::EventPropagation FocusSettingsDialog::processEvent(
     if (eventSource == "close")
     {
 
-        Log::info("FocusSettingsDialog", "close event");
-        user_config->saveConfig();
-
+        m_focus_config->setAutoConnect(m_auto_connect_checkbox->getState());
+        m_focus_config->setLowThreshold(m_low_threshold_slider->getValue());
+        m_focus_config->setHighThreshold(m_high_threshold_slider->getValue());
+        DeviceManager* device_manager = input_manager->getDeviceManager();
+        device_manager->save();
+        if(m_focus_config->getAutoConnect()){
+            connectDevice();
+        }
         ModalDialog::dismiss();
+        return GUIEngine::EVENT_BLOCK;
+    }
+    if (eventSource == "connect")
+    {
+        connectDevice();
         return GUIEngine::EVENT_BLOCK;
     }
     else if (eventSource == "restore")
     {
-        Log::info("FocusSettingsDialog", "restore event");
-        updateValues();
-
+        m_auto_connect_checkbox->setState(m_focus_config->getAutoConnect());
+        m_low_threshold_slider->setValue(m_focus_config->getLowThreshold());
+        m_high_threshold_slider->setValue(m_focus_config->getHighThreshold());
         return GUIEngine::EVENT_BLOCK;
     }
 
@@ -91,9 +109,15 @@ GUIEngine::EventPropagation FocusSettingsDialog::processEvent(
 
 // -----------------------------------------------------------------------------
 
-void FocusSettingsDialog::updateValues()
+void FocusSettingsDialog::connectDevice()
 {
-     Log::info("FocusSettingsDialog", "update");
+    DeviceManager* device_manager = input_manager->getDeviceManager();
+    if(device_manager->m_current_focus_device != NULL){
+        device_manager->m_current_focus_device->disconnectDevice();
+        device_manager->m_current_focus_device = NULL;
+    }
+    device_manager->m_current_focus_device = m_focus_device;
+    device_manager->m_current_focus_device->connectDevice();
 }
 
 // -----------------------------------------------------------------------------
