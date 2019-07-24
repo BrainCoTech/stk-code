@@ -33,7 +33,7 @@ FocusConfig::FocusConfig( const std::string &name )
     setName(name);
     m_auto_connect = false;
     m_low_threshold = 30;
-    m_high_threshold = 70;
+    m_high_threshold = 100;
 }   // FocusConfig
 
 
@@ -42,7 +42,7 @@ FocusConfig::FocusConfig()
 {
     m_auto_connect = false;
     m_low_threshold = 30;
-    m_high_threshold = 70;
+    m_high_threshold = 100;
 }   // FocusConfig
 
 //------------------------------------------------------------------------------
