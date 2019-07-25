@@ -21,6 +21,7 @@
 
 #include "config/user_config.hpp"
 #include "input/input_manager.hpp"
+#include "input/device_manager.hpp"
 #include "input/focus_device.hpp"
 #include "items/attachment.hpp"
 #include "items/item.hpp"
@@ -48,6 +49,7 @@ PlayerController::PlayerController(AbstractKart *kart)
                 : Controller(kart)
 {
     m_penalty_ticks = 0;
+    m_focus_device_enabled = (input_manager->getDeviceManager()->m_current_focus_device != NULL);
     m_focus_val = 0;
     m_device_contact_val = -1;
 }   // PlayerController
@@ -190,19 +192,21 @@ bool PlayerController::action(PlayerAction action, int value, bool dry_run)
     case PA_ACCEL:
     {
         Log::warn("player controller","[%s] keyboard accel %d", getName().c_str(), value);
-        uint16_t v16 = (uint16_t)value;
-        SET_OR_TEST(m_prev_accel, v16);
-        if (v16)
-        {
-            SET_OR_TEST_GETTER(Accel, v16 / 32768.0f);
-            SET_OR_TEST_GETTER(Brake, false);
-            SET_OR_TEST_GETTER(Nitro, m_prev_nitro);
-        }
-        else
-        {
-            SET_OR_TEST_GETTER(Accel, 0.0f);
-            SET_OR_TEST_GETTER(Brake, m_prev_brake);
-            SET_OR_TEST_GETTER(Nitro, false);
+        if(!m_focus_device_enabled){
+            uint16_t v16 = (uint16_t)value;
+            SET_OR_TEST(m_prev_accel, v16);
+            if (v16)
+            {
+                SET_OR_TEST_GETTER(Accel, v16 / 32768.0f);
+                SET_OR_TEST_GETTER(Brake, false);
+                SET_OR_TEST_GETTER(Nitro, m_prev_nitro);
+            }
+            else
+            {
+                SET_OR_TEST_GETTER(Accel, 0.0f);
+                SET_OR_TEST_GETTER(Brake, m_prev_brake);
+                SET_OR_TEST_GETTER(Nitro, false);
+            }
         }
         break;
     }

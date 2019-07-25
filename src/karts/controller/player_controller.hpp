@@ -35,6 +35,7 @@ protected:
     bool           m_prev_brake;
     bool           m_prev_nitro;
 
+    bool           m_focus_device_enabled;
     int            m_focus_val;
     int            m_device_contact_val = -1;
 
