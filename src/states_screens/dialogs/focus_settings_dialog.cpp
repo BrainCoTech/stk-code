@@ -39,8 +39,6 @@ FocusSettingsDialog::FocusSettingsDialog(const float w, const float h, FocusConf
         : ModalDialog(w, h)
 {
     loadFromFile("focus_settings_dialog.stkgui");
-    Log::error("FocusSettingsDialog", "working on config device ID: %s",
-                    config->getName().c_str());
     m_focus_device = input_manager->getDeviceManager()->getFocusDeviceByName(config->getName());
     m_focus_config = config;
     m_auto_connect_checkbox = getWidget<CheckBoxWidget>("auto_connect");
@@ -58,18 +56,6 @@ FocusSettingsDialog::FocusSettingsDialog(const float w, const float h, FocusConf
 
 FocusSettingsDialog::~FocusSettingsDialog()
 {
-}
-
-// -----------------------------------------------------------------------------
-
-void FocusSettingsDialog::beforeAddingWidgets()
-{
-    if (StateManager::get()->getGameState() == GUIEngine::INGAME_MENU)
-    {
-        CheckBoxWidget* buttons_en = getWidget<CheckBoxWidget>("buttons_enabled");
-        assert(buttons_en != NULL);
-        buttons_en->setActive(false);
-    }
 }
 
 // -----------------------------------------------------------------------------

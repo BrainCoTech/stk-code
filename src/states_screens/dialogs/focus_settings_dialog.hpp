@@ -29,8 +29,6 @@ public:
     FocusSettingsDialog(const float percentWidth, const float percentHeight, FocusConfig* config);
     ~FocusSettingsDialog();
 
-    virtual void beforeAddingWidgets();
-
     GUIEngine::EventPropagation processEvent(const std::string& eventSource);
     
 };
