@@ -34,7 +34,7 @@ private:
 
     /** Keep the widget to to the user name. */
     GUIEngine::ButtonWidget *m_user_id;
-
+    GUIEngine::ButtonWidget *m_focus_device_id;
     MainMenuScreen();
 
 public:

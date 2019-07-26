@@ -228,10 +228,12 @@ bool PlayerController::action(PlayerAction action, int value, bool dry_run)
         }
         break;
     case PA_NITRO:
-        // This basically keeps track whether the button still is being pressed
-        SET_OR_TEST(m_prev_nitro, value != 0 );
-        // Enable nitro only when also accelerating
-        SET_OR_TEST_GETTER(Nitro, ((value!=0) && m_controls->getAccel()) );
+        if(!m_focus_device_enabled){
+            // This basically keeps track whether the button still is being pressed
+            SET_OR_TEST(m_prev_nitro, value != 0 );
+            // Enable nitro only when also accelerating
+            SET_OR_TEST_GETTER(Nitro, ((value!=0) && m_controls->getAccel()) );
+        }
         break;
     case PA_RESCUE:
         SET_OR_TEST_GETTER(Rescue, value!=0);

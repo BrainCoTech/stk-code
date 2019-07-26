@@ -116,6 +116,8 @@ void MainMenuScreen::init()
 
     m_user_id = getWidget<ButtonWidget>("user-id");
     assert(m_user_id);
+    m_focus_device_id = getWidget<ButtonWidget>("focus-device-id");
+    assert(m_focus_device_id);
 
     // reset in case we're coming back from a race
     NetworkConfig::get()->cleanNetworkPlayers();
@@ -188,6 +190,13 @@ void MainMenuScreen::onUpdate(float delta)
     {
         // now must be either logging in or logging out
         m_user_id->setText(player->getName());
+    }
+
+    FocusDevice *device = input_manager->getDeviceManager()->m_current_focus_device;
+    if(device == NULL){
+        m_focus_device_id->setText("Connecting Focus Device");
+    } else {
+        m_focus_device_id->setText(device->getName().c_str());
     }
 
     IconButtonWidget* addons_icon = getWidget<IconButtonWidget>("addons");
