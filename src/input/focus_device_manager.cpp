@@ -10,42 +10,41 @@
 #include "fusi_sdk.h"
 #include <sstream>
 #include <chrono>
+#include <iomanip>  // setfill, setw
 #include "guiengine/screen_keyboard.hpp"
 using namespace std;
 FocusDeviceManager* focus_device_manager;
-std::vector<FusiDeviceInfo>         m_fusi_device_info_list;
-static const char DEVICE_FILE_NAME[] = "focus.xml";
+std::vector<FusiDeviceInfo> m_fusi_device_info_list;
+static const char DEVICE_FILE_NAME[] = "focus.log";
 
 MessageDialog* focus_device_search_dialog;
 
 FocusDeviceManager::FocusDeviceManager()
 {
     m_deviceLog = new std::ofstream();
+
+    // TODO: add timestamp to file name
     std::string filepath = file_manager->getUserConfigFile(DEVICE_FILE_NAME);
     m_deviceLog -> open(filepath.c_str(), std::ofstream::out | std::ofstream::app);
 }
 
-static string current_timelabel = "";
-static string getTimeLabel(){
-        chrono::time_point<chrono::system_clock> sys_clock = chrono::system_clock::now();
-        time_t now = chrono::system_clock::to_time_t(sys_clock);
-        tm* localTime = localtime(&now);
+static string getTimeLabel()
+{
+    chrono::time_point<chrono::system_clock> sys_clock = chrono::system_clock::now();
+    time_t now = chrono::system_clock::to_time_t(sys_clock);
+    tm* localTime = localtime(&now);
 
-        ostringstream timeLabelStream;
-        timeLabelStream << localTime->tm_year + 1900;
+    ostringstream timeLabelStream;
 
-        if(localTime->tm_mon < 9) timeLabelStream << '0';
-        timeLabelStream << localTime->tm_mon + 1;
-        if(localTime->tm_mday < 10) timeLabelStream << '0';
-        timeLabelStream << localTime->tm_mday << '-';
-        if(localTime -> tm_hour < 10) timeLabelStream << '0';
-        timeLabelStream << localTime->tm_hour << '-';
-        if(localTime -> tm_min < 10) timeLabelStream << '0';
-        timeLabelStream<< localTime->tm_min << '-';
-        if(localTime -> tm_sec < 10) timeLabelStream << '0';
-        timeLabelStream << localTime -> tm_sec;
-        return timeLabelStream.str();
-    }
+    timeLabelStream << localTime->tm_year + 1900            << '-'  // year
+        << setfill('0') << setw(2) << localTime->tm_mon + 1 << '-'  // month
+        << setfill('0') << setw(2) << localTime->tm_mday    << ' '  // day
+        << setfill('0') << setw(2) << localTime->tm_hour    << ':'  // hour
+        << setfill('0') << setw(2) << localTime->tm_min     << ':'  // min
+        << setfill('0') << setw(2) << localTime->tm_sec;            // sec
+
+    return timeLabelStream.str();
+}
 
 // -----------------------------------------------------------------------------
 FocusDeviceManager::~FocusDeviceManager()
@@ -77,13 +76,13 @@ FusiDeviceInfo* device_info_deep_copy(FusiDeviceInfo* info){
     FusiDeviceInfo* copy = (FusiDeviceInfo*)malloc(sizeof(FusiDeviceInfo));
     if(copy == NULL)
         return NULL;
-    
+
     if(str_deep_copy(&copy->ip, info->ip) != 0 ||
         str_deep_copy(&copy->mac, info->mac) != 0 ||
         str_deep_copy(&copy->name, info->name) != 0){
             return NULL;
         }
-    
+
     return copy;
 }
 
@@ -131,7 +130,7 @@ static void on_focus_search_done(FusiDeviceInfo* device, int length, FusiError* 
                                         );
                 device_manager->addFocusDevice(focusDevice);
             }
-            
+
             if(device_config->getAutoConnect() && device_manager->m_current_focus_device == NULL){
                 device_manager->m_current_focus_device = focusDevice;
                 device_manager->m_current_focus_device->connectDevice();
@@ -152,7 +151,7 @@ bool FocusDeviceManager::searchFocusDevices(){
     Log::info("Focus device manager","start searching");
     fusi_devices_search(on_focus_search_done, 5000);
     m_fusi_device_info_list.clear();
-    
+
     return false;
 }
 
@@ -188,7 +187,7 @@ void FocusDeviceManager::update()
         if(Input::IT_NONE != event.UserEvent.type)
             input_manager->input(event);
 
-        logEvent(event);        
+        logEvent(event);
     }
     events.clear();
     input_manager->getDeviceManager()->m_current_focus_device->m_irr_event.unlock();
@@ -196,39 +195,71 @@ void FocusDeviceManager::update()
 
 void FocusDeviceManager::logEvent(irr::SEvent event)
 {
-    current_timelabel = getTimeLabel();
-    if(Input::IT_NONE == event.UserEvent.type){
-        EEGData* dataForLog = (EEGData*)event.UserEvent.data;
-        *m_deviceLog << current_timelabel << " " << input_manager->getDeviceManager()->getFocusDevice(event.UserEvent.UserData1)->getFocusDeviceMac() << " " << event.UserEvent.type << " ";
-        *m_deviceLog << dataForLog->size << " " << dataForLog->sample_rate << " " << dataForLog->pga << " ";
-        *m_deviceLog << "[" << dataForLog->data[0];
-        for(int i = 1; i < dataForLog->size; i++){
-            *m_deviceLog << " " << dataForLog->data[i] ;
+    string currentTimeLabel = getTimeLabel();
+    const char * focusDeviceMac = input_manager->getDeviceManager()
+                                    ->getFocusDevice(event.UserEvent.UserData1)
+                                    ->getFocusDeviceMac();
+
+    if (Input::IT_NONE == event.UserEvent.type) {
+        EEGData* eeg = (EEGData*) event.UserEvent.data;
+
+        *m_deviceLog << currentTimeLabel
+                    << " " << focusDeviceMac
+                    << " " << event.UserEvent.type
+                    << " " << eeg->size
+                    << " " << eeg->sample_rate
+                    << " " << eeg->pga;
+
+        // eeg data
+        *m_deviceLog << " [";
+        for (int i = 0; i < eeg->size; i++) {
+            if (i != 0) {
+                *m_deviceLog << " ";
+            }
+            *m_deviceLog << eeg->data[i];
         }
         *m_deviceLog << "]" << endl;
 
-        delete [] dataForLog->data;
-        delete dataForLog;
-    }
-    else{
-        bool isInGame = (StateManager::get()->getGameState() == GUIEngine::GAME &&
-             !GUIEngine::ModalDialog::isADialogActive()            &&
-             !GUIEngine::ScreenKeyboard::isActive()                &&
-             !race_manager->isWatchingReplay() );
+        delete [] eeg->data;
+        delete eeg;
 
-        bool isInGameMode = (StateManager::get()->getGameState() == GUIEngine::GAME);
-        if(isInGame)
-            *m_deviceLog << current_timelabel << " " << input_manager->getDeviceManager()->getFocusDevice(event.UserEvent.UserData1)->getFocusDeviceMac() << " " << event.UserEvent.type << " " << event.UserEvent.UserData2 << " 0 INGAME" <<  std::endl;
-        else if(isInGameMode)
-            *m_deviceLog << current_timelabel << " " << input_manager->getDeviceManager()->getFocusDevice(event.UserEvent.UserData1)->getFocusDeviceMac() << " " << event.UserEvent.type << " " << event.UserEvent.UserData2 << " 1 INPAUSE" <<  std::endl;
-        else
-            *m_deviceLog << current_timelabel << " " << input_manager->getDeviceManager()->getFocusDevice(event.UserEvent.UserData1)->getFocusDeviceMac() << " " << event.UserEvent.type << " " << event.UserEvent.UserData2 << " 2 OTHERS" << std::endl;
+    } else {
+        // in game mode
+        bool isInGameMode = StateManager::get()->getGameState() == GUIEngine::GAME;
+
+        // in game
+        bool isInGame = isInGameMode
+                && !GUIEngine::ModalDialog::isADialogActive()
+                && !GUIEngine::ScreenKeyboard::isActive()
+                && !race_manager->isWatchingReplay();
+
+        // game status
+        string gameStatus;
+        if (isInGame) {
+            gameStatus = "0 INGAME";
+        } else if (isInGameMode) {
+            gameStatus = "1 INPAUSE";
+        } else {
+            gameStatus = "2 OTHERS";
+        }
+
+        *m_deviceLog << currentTimeLabel
+                    << " " << focusDeviceMac
+                    << " " << event.UserEvent.type
+                    << " " << event.UserEvent.UserData2
+                    << " " << gameStatus
+                    << std::endl;
     }
 }
 
 void FocusDeviceManager::logTagEvent(string tag)
 {
-    current_timelabel = getTimeLabel();
-    *m_deviceLog << current_timelabel << " " << input_manager->getDeviceManager()->m_current_focus_device->getFocusDeviceMac() << " " << tag << std::endl;
+    string currentTimeLabel = getTimeLabel();
+    const char * focusDeviceMac = input_manager->getDeviceManager()
+                                    ->m_current_focus_device
+                                    ->getFocusDeviceMac();
 
+    *m_deviceLog << currentTimeLabel
+            << " " << focusDeviceMac
+            << " " << tag << std::endl;
 }
