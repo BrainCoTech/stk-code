@@ -29,7 +29,6 @@ static void input(irr::SEvent event)
     input_manager->getDeviceManager()->m_current_focus_device->m_irr_event.lock();
     std::vector<irr::SEvent>&  events = input_manager->getDeviceManager()->m_current_focus_device->m_irr_event.getData();
     events.push_back(event);
-    //Log::warn("focus device", "after input left event size is:[%ld] [%ld]", events.size(), input_manager->getDeviceManager()->m_current_focus_device->m_irr_event.getData().size());
     input_manager->getDeviceManager()->m_current_focus_device->m_irr_event.unlock();
 }
 
@@ -250,6 +249,13 @@ bool FocusDevice::processAndMapInput(Input::InputType type,  const int id,
                                         InputManager::InputDriverMode mode,
                                         PlayerAction *action, int* value)
 {
+    if (type == Input::IT_FOCUS_CONTACT)
+		{
+            m_device_contact_value = *value;
+			//return m_configuration->getGameAction(Input::IT_FOCUS_CONTACT, id, value, action);
+			*action = PlayerAction(PA_FOCUS_CONTACT);
+			return true;
+		}
     // bindings can only be accessed in game
     if (mode == InputManager::INGAME)
     {
@@ -265,15 +271,8 @@ bool FocusDevice::processAndMapInput(Input::InputType type,  const int id,
             } else if(*value < 0){
                 *value = 0;
             }
-            Log::info("Focus device", "processAndMapInput value %d", low_threshold);
 			return true;
         }
-		if (type == Input::IT_FOCUS_CONTACT)
-		{
-			//return m_configuration->getGameAction(Input::IT_FOCUS_CONTACT, id, value, action);
-			*action = PlayerAction(PA_FOCUS_CONTACT);
-			return true;
-		}
     }
     return false;
 }   // processAndMapInput

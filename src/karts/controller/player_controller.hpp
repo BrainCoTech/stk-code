@@ -111,7 +111,7 @@ public:
 
         return m_focus_val;
     }
-    int getDeviceContactValue() const OVERRIDE { return input_manager->getDeviceContactValue(); }
+    int getDeviceContactValue() const OVERRIDE { return m_device_contact_val; }
 };   // class PlayerController
 
 #endif // HEADER_PLAYER_CONTROLLER_HPP

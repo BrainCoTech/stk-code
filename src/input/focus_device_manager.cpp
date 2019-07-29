@@ -96,9 +96,11 @@ void device_info_release(FusiDeviceInfo* info){
     free(info);
 }
 
+//TODO: This function is getting super ugly, rewrite
 static void on_focus_search_done(FusiDeviceInfo* device, int length, FusiError* error)
 {
     bool created = false;
+    DeviceManager* device_manager = input_manager->getDeviceManager();
     if(length < 0){
         printf("errorcode : %d\n", length);
     }
@@ -107,7 +109,6 @@ static void on_focus_search_done(FusiDeviceInfo* device, int length, FusiError* 
     }
     else{
         printf("found [%d] devices\n", length);
-        DeviceManager* device_manager = input_manager->getDeviceManager();
         for(int id = 0; id < length; id++){
             printf("device ip[%s] mac[%s] name[%s]\n", device[id].ip, device[id].mac, device[id].name);
             m_fusi_device_info_list.push_back(device[id]);
@@ -118,19 +119,20 @@ static void on_focus_search_done(FusiDeviceInfo* device, int length, FusiError* 
                 created = true;
             }
 
-            FocusDevice* focusDevice = NULL;
-            FusiDeviceInfo* focusDeviceInfo = device_info_deep_copy(&device[id]);
-            device_config->setPlugged();
-            focusDevice = new FocusDevice(id,
+            FocusDevice* focusDevice = device_manager->getFocusDeviceByName(device[id].name);
+            if(focusDevice == NULL){
+                FusiDeviceInfo* focusDeviceInfo = device_info_deep_copy(&device[id]);
+                if(!device_config->isPlugged()){
+                    device_config->setPlugged();
+                }
+                focusDevice = new FocusDevice(id,
                                           focusDeviceInfo,
                                           device_config
                                         );
-            device_manager->addFocusDevice(focusDevice);
-            if(device_config->getAutoConnect()){
-                if(device_manager->m_current_focus_device != NULL){
-                    device_manager->m_current_focus_device->disconnectDevice();
-                    device_manager->m_current_focus_device = NULL;
-                }
+                device_manager->addFocusDevice(focusDevice);
+            }
+            
+            if(device_config->getAutoConnect() && device_manager->m_current_focus_device == NULL){
                 device_manager->m_current_focus_device = focusDevice;
                 device_manager->m_current_focus_device->connectDevice();
             }
@@ -140,6 +142,9 @@ static void on_focus_search_done(FusiDeviceInfo* device, int length, FusiError* 
     if (focus_device_search_dialog != NULL){
         focus_device_search_dialog->dismiss();
         ((OptionsScreenInput*)GUIEngine::getCurrentScreen())->rebuildDeviceList();
+    }
+    if(device_manager->m_current_focus_device == NULL){
+        focus_device_manager->searchFocusDevices();
     }
 }
 
@@ -185,9 +190,7 @@ void FocusDeviceManager::update()
 
         logEvent(event);        
     }
-    //Log::warn("focus device manager", "before update left event size is: %ld", input_manager->getDeviceManager()->m_current_focus_device->m_irr_event.getData().size());
     events.clear();
-    //Log::warn("focus device manager", "after update left event size is: %ld", input_manager->getDeviceManager()->m_current_focus_device->m_irr_event.getData().size());
     input_manager->getDeviceManager()->m_current_focus_device->m_irr_event.unlock();
 }
 

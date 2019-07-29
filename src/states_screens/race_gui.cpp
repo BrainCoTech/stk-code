@@ -361,7 +361,6 @@ void RaceGUI::renderPlayerView(const Camera *camera, float dt)
         drawPowerupIcons(kart, viewport, scaling);
         drawSpeedEnergyRank(kart, viewport, scaling, dt);
         drawFocusMeter(kart, viewport, scaling, dt);
-        drawDeviceContactStatus(kart, viewport, scaling);
     }
 
     if (!m_is_tutorial)
@@ -1354,6 +1353,7 @@ void RaceGUI::drawFocusMeter(const AbstractKart* kart,
                 true /* alpha */);
 
     drawFocusScore(focusScore, offset, min_ratio, gauge_width, gauge_height, dt);
+    drawDeviceContactStatus(kart, offset, min_ratio, gauge_width, gauge_height, dt);
 #endif
 }
 
@@ -1381,34 +1381,33 @@ void RaceGUI::drawFocusScore(int focusScore,
 
 
 void RaceGUI::drawDeviceContactStatus(const AbstractKart* kart,
-                      const core::recti &viewport,
-                      const core::vector2df &scaling)
+                      const core::vector2df &offset,
+                      float min_ratio, int gauge_width,
+                      int gauge_height, float dt)
 {
-    //std::ostringstream oss;
     std::ostringstream oss;
     int deviceContactState = (kart->getController())->getDeviceContactValue();
-    oss << deviceContactState;
+    if( deviceContactState <= 0 ){
+            oss << "Connecting";
+        }
+        if( deviceContactState == 1 ){
+            oss << "Detecting";
+        }
+        if( deviceContactState == 2 ){
+            oss << "Wearing";
+        }
+        if( deviceContactState >= 3 ){
+            oss << "Passed";
+        }
 
     core::recti pos;
-    pos.UpperLeftCorner.Y = viewport.UpperLeftCorner.Y + 2 * m_font_height;
-
-    // If the time display in the top right is in this viewport,
-    // move the lap/rank display down a little bit so that it is
-    // displayed under the time.
-    if (viewport.UpperLeftCorner.Y == 0 &&
-        viewport.LowerRightCorner.X == (int)(irr_driver->getActualScreenSize().Width) &&
-        !race_manager->getIfEmptyScreenSpaceExists()) 
-    {
-        pos.UpperLeftCorner.Y +=  2*m_font_height;
-    }
-    pos.LowerRightCorner.Y  = viewport.LowerRightCorner.Y+40;
-    pos.UpperLeftCorner.X   = viewport.LowerRightCorner.X
-                            - m_lap_width - 10;
-    pos.LowerRightCorner.X  = viewport.LowerRightCorner.X;
+    pos.LowerRightCorner = core::vector2di(int(offset.X + 0.64f*gauge_width),
+                                           int(offset.Y + 0.49f*gauge_height));
+    pos.UpperLeftCorner = core::vector2di(int(offset.X + 0.64f*gauge_width),
+                                          int(offset.Y + 0.49f*gauge_height));
 
     static video::SColor color = video::SColor(255, 255, 255, 255);
     gui::ScalableFont* font = GUIEngine::getHighresDigitFont();
-    font->setScale(scaling.Y < 1.0f ? 0.5f: 1.0f);
     font->draw(oss.str().c_str(), pos, color, true, true);
     font->setScale(1.0f);
 }   // drawFocusScore

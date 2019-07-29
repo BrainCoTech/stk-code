@@ -77,7 +77,6 @@ private:
     /** For supporting BrainCo Focus device **/
     PtrVector<FocusDevice, HOLD>        m_focus_devices;
     PtrVector<FocusConfig, HOLD>        m_focus_configs;
-    bool                                m_focus_device_enabled;
 
     /** The list of all joysticks that were found and activated. */
     core::array<SJoystickInfo>         m_irrlicht_gamepads;

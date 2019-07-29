@@ -197,6 +197,11 @@ void DeviceManager::clearGamepads()
     m_gamepads.clearAndDeleteAll(); 
 }   // clearGamepads
 // -----------------------------------------------------------------------------
+void DeviceManager::clearFocusDevices()
+{
+    m_focus_devices.clearAndDeleteAll();
+}   // clearFocusDevices
+// -----------------------------------------------------------------------------
 void DeviceManager::clearMultitouchDevices()
 {
     delete m_multitouch_device;
@@ -225,7 +230,10 @@ void DeviceManager::setAssignMode(const PlayerAssignMode assignMode)
         {
             m_keyboards[i].setPlayer(NULL);
         }
-
+        for (unsigned int i=0; i < m_focus_devices.size(); i++)
+        {
+            m_focus_devices[i].setPlayer(NULL);
+        }
         if (m_multitouch_device != NULL)
             m_multitouch_device->setPlayer(NULL);
     }
@@ -792,8 +800,12 @@ void DeviceManager::shutdown()
 {
     m_gamepads.clearAndDeleteAll();
     m_keyboards.clearAndDeleteAll();
+    m_focus_devices.clearAndDeleteAll();
     m_gamepad_configs.clearAndDeleteAll();
     m_keyboard_configs.clearAndDeleteAll();
+    m_focus_configs.clearAndDeleteAll();
+    delete m_current_focus_device;
+    m_current_focus_device = NULL;
     delete m_multitouch_device;
     m_multitouch_device = NULL;
     m_latest_used_device = NULL;

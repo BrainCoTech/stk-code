@@ -18,6 +18,7 @@ class FocusDevice : public InputDevice
 private:
     /** Index of this element the arrays of focus devices */
     int             m_focus_device_id;
+    int             m_device_contact_value;
     FusiDeviceInfo* m_focus_device_info;
     FusiDevice*     m_focus_device;
 public:
@@ -33,6 +34,7 @@ public:
     void disconnectDevice();
     
     int getFocusDeviceId() { return m_focus_device_id; }
+    int getDeviceContactValue() { return m_device_contact_value; }
     const char* getFocusDeviceMac() { return m_focus_device_info->mac; }
     Synchronised<std::vector<irr::SEvent> > m_irr_event;
     static int thresholding_strategy_1(int value, int min, int max);

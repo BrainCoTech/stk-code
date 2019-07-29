@@ -192,11 +192,23 @@ void MainMenuScreen::onUpdate(float delta)
         m_user_id->setText(player->getName());
     }
 
-    FocusDevice *device = input_manager->getDeviceManager()->m_current_focus_device;
-    if(device == NULL){
+    if(input_manager->getDeviceManager()->m_current_focus_device == NULL){
         m_focus_device_id->setText("Connecting Focus Device");
     } else {
-        m_focus_device_id->setText(device->getName().c_str());
+        int contactVale = input_manager->getDeviceManager()->m_current_focus_device->getDeviceContactValue();
+        std::string name = input_manager->getDeviceManager()->m_current_focus_device->getName();
+        if( contactVale <= 0 ){
+            m_focus_device_id->setText((name + std::string(" Connecting")).c_str());
+        }
+        if( contactVale == 1 ){
+            m_focus_device_id->setText((name + std::string(" Detecting")).c_str());
+        }
+        if( contactVale == 2 ){
+            m_focus_device_id->setText((name + std::string(" Wearing")).c_str());
+        }
+        if( contactVale >= 3 ){
+            m_focus_device_id->setText((name + std::string(" Passed")).c_str());
+        }
     }
 
     IconButtonWidget* addons_icon = getWidget<IconButtonWidget>("addons");

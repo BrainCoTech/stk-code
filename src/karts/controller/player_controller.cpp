@@ -278,6 +278,9 @@ bool PlayerController::action(PlayerAction action, int value, bool dry_run)
         break;
     case PA_FOCUS:
     {
+        if(m_device_contact_val < 3){
+            SET_OR_TEST(m_device_contact_val, 3);
+        }
         SET_OR_TEST(m_focus_val, value);
         //Player will get penalty if accelerate in start phase
         if(World::getWorld()->isRacePhase()){

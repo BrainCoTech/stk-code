@@ -52,9 +52,6 @@ public:
 
 private:
 
-    // super ugly hack
-    int            m_device_contact_val;
-
     DeviceManager  *m_device_manager;
     std::set<std::tuple<int, int>>   m_sensed_input_high_gamepad;
     std::set<int>   m_sensed_input_high_kbd;
@@ -104,11 +101,6 @@ public:
     /** Returns the ID of the player that plays with the keyboard,
      *  or -1 if none. */
     int    getPlayerKeyboardID() const;
-    int getDeviceContactValue() const  { 
-        if(m_device_contact_val >= 3)
-            return 3;
-        else
-            return m_device_contact_val; }
 };
 
 extern InputManager *input_manager;

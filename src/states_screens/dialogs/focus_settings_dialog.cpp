@@ -98,12 +98,15 @@ GUIEngine::EventPropagation FocusSettingsDialog::processEvent(
 void FocusSettingsDialog::connectDevice()
 {
     DeviceManager* device_manager = input_manager->getDeviceManager();
-    if(device_manager->m_current_focus_device != NULL){
-        device_manager->m_current_focus_device->disconnectDevice();
-        device_manager->m_current_focus_device = NULL;
+    if(device_manager->m_current_focus_device != m_focus_device){
+        if(device_manager->m_current_focus_device != NULL){
+            device_manager->m_current_focus_device->disconnectDevice();
+            device_manager->m_current_focus_device = NULL;
+        }
+        device_manager->m_current_focus_device = m_focus_device;
+        device_manager->m_current_focus_device->connectDevice();
     }
-    device_manager->m_current_focus_device = m_focus_device;
-    device_manager->m_current_focus_device->connectDevice();
+    
 }
 
 // -----------------------------------------------------------------------------

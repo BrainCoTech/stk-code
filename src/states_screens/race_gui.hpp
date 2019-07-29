@@ -138,8 +138,9 @@ private:
                                 float min_ratio, int gauge_width,
                                 int gauge_height, float dt);
     void drawDeviceContactStatus(const AbstractKart* kart,
-                      const core::recti &viewport,
-                      const core::vector2df &scaling);
+                                const core::vector2df &offset,
+                                float min_ratio, int gauge_width,
+                                int gauge_height, float dt);
     /* Helper functions for drawing meters */
 
     void drawMeterTexture(video::ITexture *meter_texture, video::S3DVertex vertices[], unsigned int count);

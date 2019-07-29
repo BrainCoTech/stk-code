@@ -85,8 +85,6 @@ InputManager::InputManager() : m_mode(BOOTSTRAP),
     m_timer_in_use = false;
     m_master_player_only = false;
     m_timer = 0;
-    m_device_contact_val = -1;
-
 }
 // -----------------------------------------------------------------------------
 void InputManager::update(float dt)
@@ -640,20 +638,6 @@ void InputManager::dispatchInput(Input::InputType type, int deviceID,
                                  Input::AxisDirection axisDirection, int value,
                                  bool shift_mask)
 {
-    if (type == Input::IT_FOCUS){
-        if(m_device_contact_val < 3)
-            m_device_contact_val = 3;
-    }
-    else if (type == Input::IT_FOCUS_CONTACT)
-    {
-        Log::warn("input manager","contact state change to [%d]", value);
-        m_device_contact_val = value;
-        // update widget label
-        //ButtonWidget* delete_button = getWidget<ButtonWidget>("delete");
-        //std::ostringstream oss;
-        //oss << value;
-        //delete_button->setLabel(oss.str().c_str());
-    }
     // Act different in input sensing mode.
     if (m_mode == INPUT_SENSE_KEYBOARD ||
         m_mode == INPUT_SENSE_GAMEPAD)
@@ -1054,13 +1038,20 @@ EventPropagation InputManager::input(const SEvent& event)
     }
     else if (event.EventType == EET_USER_EVENT)
     {
-        Log::info("InputManager", "user event: UserData1 %d, UserData2 %d", event.UserEvent.UserData1, event.UserEvent.UserData2);
+        
         if(event.UserEvent.type == Input::IT_FOCUS_CONTACT)
+        {
+            Log::info("InputManager", "user focus contact event: UserData1 %d, UserData2 %d", event.UserEvent.UserData1, event.UserEvent.UserData2);
             dispatchInput(Input::IT_FOCUS_CONTACT, event.UserEvent.UserData1, 0,
                       Input::AD_POSITIVE, event.UserEvent.UserData2);
+        }
+            
         else if(event.UserEvent.type == Input::IT_FOCUS)
+        {
+            Log::info("InputManager", "user focus value event: UserData1 %d, UserData2 %d", event.UserEvent.UserData1, event.UserEvent.UserData2);
             dispatchInput(Input::IT_FOCUS, event.UserEvent.UserData1, 0,
                       Input::AD_POSITIVE, event.UserEvent.UserData2);
+        }
     }
     else if (event.EventType == EET_KEY_INPUT_EVENT)
     {
