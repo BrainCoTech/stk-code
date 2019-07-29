@@ -14,7 +14,7 @@ mkdir -p cmake_build
 cd cmake_build
 
 # remove supertuxkart.app
-rm -rf bin/supertuxkart.app
+rm -rf bin
 
 # cmake generate project
 CMAKE_PREFIX_PATH=/usr/local/opt/freetype/:/usr/local/opt/curl/:/usr/local/opt/libogg/:/usr/local/opt/libogg/:/usr/local/opt/libvorbis/:/usr/local/opt/glew/:/usr/local/opt/fribidi/ \
