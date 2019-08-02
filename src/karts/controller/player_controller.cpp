@@ -285,7 +285,17 @@ bool PlayerController::action(PlayerAction action, int value, bool dry_run)
             SET_OR_TEST(m_device_contact_val, 3);
         }
         SET_OR_TEST(m_focus_val, value);
-        Log::warn("player controller","m_focus_val %d", value);
+        if(m_focus_val > 32767){
+            m_kart->setEnergy(100.0f);
+            // This basically keeps track whether the button still is being pressed
+            SET_OR_TEST(m_prev_nitro, true );
+            // Enable nitro only when also accelerating
+            SET_OR_TEST_GETTER(Nitro, m_controls->getAccel());
+        }else{
+            m_kart->setEnergy(0);
+            // This basically keeps track whether the button still is being pressed
+            SET_OR_TEST(m_prev_nitro, false );
+        }
         break;
     }
     default:
