@@ -230,7 +230,13 @@ void FocusDeviceManager::logEvent(irr::SEvent event)
                                     ->getFocusDeviceMac();
     *m_deviceLog << ", \"device_mac\": \"" << focusDeviceMac << "\"";
 
-    // 4. TODO: low, high threshold
+    // 4. low, high threshold
+    FocusConfig* config = (FocusConfig*) input_manager->getDeviceManager()
+        ->m_current_focus_device
+        ->getConfiguration();
+
+    *m_deviceLog << ", \"low_threshold\": " << config->getLowThreshold()
+                << ", \"high_threshold\": " << config->getHighThreshold();
 
     // 5. event type and data
     *m_deviceLog << ", \"event_type\": ";
