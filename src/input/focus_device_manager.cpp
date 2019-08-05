@@ -195,61 +195,89 @@ void FocusDeviceManager::update()
 
 void FocusDeviceManager::logEvent(irr::SEvent event)
 {
+    // JSON Log Format
+    // https://github.com/BrainCoTech/stk-code/issues/9
+
+    // begin
+    *m_deviceLog << "{";
+
+    // 1. date_time
     string currentTimeLabel = getTimeLabel();
+    *m_deviceLog << "\"date_time\": \"" << currentTimeLabel << "\"";
+
+    // in game mode
+    bool isInGameMode = StateManager::get()->getGameState() == GUIEngine::GAME;
+    // in game
+    bool isInGame = isInGameMode
+            && !GUIEngine::ModalDialog::isADialogActive()
+            && !GUIEngine::ScreenKeyboard::isActive()
+            && !race_manager->isWatchingReplay();
+
+    // 2. game status
+    string gameStatus;
+    if (isInGame) {
+        gameStatus = "INGAME";
+    } else if (isInGameMode) {
+        gameStatus = "INPAUSE";
+    } else {
+        gameStatus = "OTHERS";
+    }
+    *m_deviceLog << ", \"game_status\": \"" << gameStatus << "\"";
+
+    // 3. FocusDeviceMac
     const char * focusDeviceMac = input_manager->getDeviceManager()
                                     ->getFocusDevice(event.UserEvent.UserData1)
                                     ->getFocusDeviceMac();
+    *m_deviceLog << ", \"device_mac\": \"" << focusDeviceMac << "\"";
 
-    if (Input::IT_NONE == event.UserEvent.type) {
-        EEGData* eeg = (EEGData*) event.UserEvent.data;
+    // 4. TODO: low, high threshold
 
-        *m_deviceLog << currentTimeLabel
-                    << " " << focusDeviceMac
-                    << " " << event.UserEvent.type
-                    << " " << eeg->size
-                    << " " << eeg->sample_rate
-                    << " " << eeg->pga;
+    // 5. event type and data
+    *m_deviceLog << ", \"event_type\": ";
+    switch (event.UserEvent.type) {
+        // 5-1. IT_NONE
+        case Input::IT_NONE: {
+            EEGData* eeg = (EEGData*) event.UserEvent.data;
+            *m_deviceLog << "\"IT_NONE\""
+                         << ", \"egg\": {\"sample_rate\": " << eeg->sample_rate
+                         << ", \"pga\": " << eeg->pga
+                         << ", \"data\": [";
 
-        // eeg data
-        *m_deviceLog << " [";
-        for (int i = 0; i < eeg->size; i++) {
-            if (i != 0) {
-                *m_deviceLog << " ";
+            for (int i = 0; i < eeg->size; i++) {
+                if (i != 0) {
+                    *m_deviceLog << ", ";
+                }
+                *m_deviceLog << eeg->data[i];
             }
-            *m_deviceLog << eeg->data[i];
-        }
-        *m_deviceLog << "]" << endl;
+            *m_deviceLog << "]}";
 
-        delete [] eeg->data;
-        delete eeg;
-
-    } else {
-        // in game mode
-        bool isInGameMode = StateManager::get()->getGameState() == GUIEngine::GAME;
-
-        // in game
-        bool isInGame = isInGameMode
-                && !GUIEngine::ModalDialog::isADialogActive()
-                && !GUIEngine::ScreenKeyboard::isActive()
-                && !race_manager->isWatchingReplay();
-
-        // game status
-        string gameStatus;
-        if (isInGame) {
-            gameStatus = "0 INGAME";
-        } else if (isInGameMode) {
-            gameStatus = "1 INPAUSE";
-        } else {
-            gameStatus = "2 OTHERS";
+            delete [] eeg->data;
+            delete eeg;
+            break;
         }
 
-        *m_deviceLog << currentTimeLabel
-                    << " " << focusDeviceMac
-                    << " " << event.UserEvent.type
-                    << " " << event.UserEvent.UserData2
-                    << " " << gameStatus
-                    << std::endl;
+        // 5-2. IT_FOCUS
+        case Input::IT_FOCUS: {
+            *m_deviceLog << "\"IT_FOCUS\", \"attention_or_acc\": " << event.UserEvent.UserData2;
+            break;
+        }
+
+        // 5-3. IT_FOCUS_CONTACT
+        case Input::IT_FOCUS_CONTACT:{
+            // state: -1 ~ 5
+            *m_deviceLog << "\"IT_FOCUS_CONTACT\", \"contact_state\": " << event.UserEvent.UserData2;
+            break;
+        }
+
+        // 5-4. UNKNOWN
+        default:{
+            *m_deviceLog << "\"UNKNOWN\"";
+            break;
+        }
     }
+
+    // end
+    *m_deviceLog << "}" << endl;
 }
 
 void FocusDeviceManager::logTagEvent(string tag)
